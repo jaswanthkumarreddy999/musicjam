@@ -10,10 +10,8 @@ class RoomSocketManager {
         this.isConnected = false;
         this.roomData = null;
         this.musicLibrary = [];
-        this.hasVotedSkip = false;
         this.dragSrcIndex = null;
         this.autoRequeue = false;
-        this.noDuplicates = false;
 
         this.COLORS = [
             '#00f59b', '#00b4d8', '#e040fb', '#ff6b6b',
@@ -147,15 +145,8 @@ class RoomSocketManager {
             this.queueList.addEventListener('click', e => {
                 const removeBtn = e.target.closest('.queue-action-btn.remove');
                 if (removeBtn) { this.removeFromQueue(removeBtn.dataset.songId); return; }
-                const upvoteBtn = e.target.closest('.queue-action-btn.upvote');
-                if (upvoteBtn) { this.upvoteSong(upvoteBtn.dataset.queueId); return; }
             });
         }
-
-        // Skip vote
-        document.addEventListener('click', e => {
-            if (e.target.id === 'skip-vote-btn') this.voteSkip();
-        });
 
         // Toggle buttons
         if (this.autoRequeueBtn) {
@@ -249,18 +240,6 @@ class RoomSocketManager {
             this.audioPlayer.syncPlayback(data.currentTime, !this.audioPlayer.audio.paused, data.timestamp);
         });
 
-        this.socket.on('skip-vote-update', data => {
-            const btn = document.getElementById('skip-vote-btn');
-            if (btn) btn.textContent = `⏭ Skip (${data.votes}/${data.needed})`;
-        });
-
-        this.socket.on('skip-vote-passed', () => {
-            this.hasVotedSkip = false;
-            this.showToast('Skip vote passed! ⏭', 'success');
-            const btn = document.getElementById('skip-vote-btn');
-            if (btn) { btn.textContent = '⏭ Vote Skip'; btn.disabled = false; }
-        });
-
         this.socket.on('repeat-mode-updated', data => {
             if (this.roomData) this.roomData.repeatMode = data.repeatMode;
             if (this.audioPlayer) this.audioPlayer.updateRepeatUI(data.repeatMode);
@@ -347,7 +326,6 @@ class RoomSocketManager {
         if (roomData.currentSong) {
             this.audioPlayer.loadSong(roomData.currentSong);
             this.audioPlayer.syncPlayback(roomData.currentTime, roomData.isPlaying, Date.now());
-            this.injectSkipVoteBtn();
         } else {
             this.audioPlayer.reset();
         }
@@ -355,26 +333,6 @@ class RoomSocketManager {
         if (roomData.userList) this.renderListeners(roomData.userList);
         if (roomData.repeatMode !== undefined) this.audioPlayer.updateRepeatUI(roomData.repeatMode);
         if (roomData.hasPrev !== undefined) this.audioPlayer.updatePrevButton(roomData.hasPrev);
-    }
-
-    /* ── Skip vote ── */
-    injectSkipVoteBtn() {
-        if (document.getElementById('skip-vote-btn')) return;
-        const vs = document.querySelector('.volume-section');
-        if (!vs) return;
-        const btn = document.createElement('button');
-        btn.id = 'skip-vote-btn';
-        btn.className = 'btn btn-secondary btn-small skip-vote-btn';
-        btn.textContent = '⏭ Vote Skip';
-        vs.after(btn);
-    }
-
-    voteSkip() {
-        if (this.hasVotedSkip) return;
-        this.hasVotedSkip = true;
-        this.socket.emit('vote-skip');
-        const btn = document.getElementById('skip-vote-btn');
-        if (btn) { btn.textContent = '✓ Voted'; btn.disabled = true; }
     }
 
     /* ── Queue ── */
@@ -400,9 +358,7 @@ class RoomSocketManager {
                         <div class="queue-song-title">${this.escapeHtml(song.title)}</div>
                         <div class="queue-song-artist">${this.escapeHtml(song.artist)}</div>
                     </div>
-                    <div class="queue-vote-count" title="Upvotes">▲ ${song.votes || 0}</div>
                     <div class="queue-actions">
-                        <button class="queue-action-btn upvote" data-queue-id="${song.id}" title="Upvote">▲</button>
                         <button class="queue-action-btn remove" data-song-id="${song.id}" title="Remove">✕</button>
                     </div>
                 </div>
@@ -444,14 +400,10 @@ class RoomSocketManager {
         });
     }
 
-    upvoteSong(queueItemId) { this.socket.emit('upvote-song', { queueItemId }); }
-
     handlePlaybackState(data) {
         if (data.currentSong) {
-            // Keep roomData current song in sync for library filtering
             if (this.roomData) this.roomData.currentSong = data.currentSong;
             this.audioPlayer.loadSong(data.currentSong);
-            this.injectSkipVoteBtn();
         }
         if (data.isPlaying) { this.audioPlayer.play(); }
         else { this.audioPlayer.pause(); }

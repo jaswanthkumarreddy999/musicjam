@@ -229,7 +229,7 @@ class Room {
     this.currentTime = 0;
     this.lastUpdate = Date.now();
     this.createdAt = Date.now();
-    this.skipVotes = new Set();   // socket IDs that voted to skip
+    this.skipVotes = new Set();
     this.history = [];            // played songs history
     this.repeatMode = 'none';     // 'none' | 'one' | 'queue'
     this.autoRequeue = false;     // re-add finished songs to end of queue
@@ -270,31 +270,9 @@ class Room {
       originalSongId: song.id,
       ...song,
       addedBy: song.addedBy,
-      addedAt: Date.now(),
-      votes: 0,
-      voters: []
+      addedAt: Date.now()
     });
     return { added: true };
-  }
-
-  upvoteSong(queueItemId, socketId) {
-    const item = this.queue.find(s => s.id === queueItemId);
-    if (!item) return false;
-    if (item.voters.includes(socketId)) return false; // already voted
-    item.votes++;
-    item.voters.push(socketId);
-    // Re-sort: preserve song at index 0 (currently playing next), sort rest by votes desc
-    if (this.queue.length > 1) {
-      const [first, ...rest] = this.queue;
-      rest.sort((a, b) => b.votes - a.votes);
-      this.queue = [first, ...rest];
-    }
-    return true;
-  }
-
-  addSkipVote(socketId) {
-    this.skipVotes.add(socketId);
-    return this.skipVotes.size;
   }
 
   clearSkipVotes() {
@@ -324,9 +302,7 @@ class Room {
         duration: this.currentSong.duration,
         filename: this.currentSong.filename,
         path: this.currentSong.path,
-        addedBy: this.currentSong.addedBy,
-        votes: 0,
-        voters: []
+        addedBy: this.currentSong.addedBy
       });
     }
 
@@ -346,9 +322,7 @@ class Room {
           duration: this.currentSong.duration,
           filename: this.currentSong.filename,
           path: this.currentSong.path,
-          addedBy: this.currentSong.addedBy,
-          votes: 0,
-          voters: []
+          addedBy: this.currentSong.addedBy
         });
       }
 
@@ -1036,18 +1010,7 @@ io.on('connection', (socket) => {
     }
   });
   
-  // Upvote a song in the queue (Feature 2)
-  socket.on('upvote-song', (data) => {
-    const { queueItemId } = data;
-    const room = rooms.get(socket.currentRoom);
-    if (!room) return;
-    const changed = room.upvoteSong(queueItemId, socket.id);
-    if (changed) {
-      io.to(socket.currentRoom).emit('queue-updated', { queue: room.queue });
-    }
-  });
-
-  // Drag-to-reorder queue (Feature 3)
+  // Drag-to-reorder queue
   socket.on('reorder-queue', (data) => {
     const { fromIndex, toIndex } = data;
     const room = rooms.get(socket.currentRoom);
@@ -1057,32 +1020,6 @@ io.on('connection', (socket) => {
     const [moved] = q.splice(fromIndex, 1);
     q.splice(toIndex, 0, moved);
     io.to(socket.currentRoom).emit('queue-updated', { queue: room.queue });
-  });
-
-  // Vote to skip current song (Feature 2)
-  socket.on('vote-skip', () => {
-    const room = rooms.get(socket.currentRoom);
-    if (!room || !room.currentSong) return;
-    const votes = room.addSkipVote(socket.id);
-    const threshold = Math.ceil(room.users.size / 2);
-    io.to(socket.currentRoom).emit('skip-vote-update', {
-      votes,
-      needed: threshold,
-      voterSocketId: socket.id
-    });
-    if (votes >= threshold) {
-      const nextSong = room.nextSong();
-      if (nextSong) room.play();
-      io.to(socket.currentRoom).emit('playback-state', {
-        isPlaying: !!nextSong,
-        currentSong: room.currentSong,
-        currentTime: 0,
-        queue: room.queue,
-        repeatMode: room.repeatMode,
-        hasPrev: room.history.length > 0
-      });
-      io.to(socket.currentRoom).emit('skip-vote-passed', {});
-    }
   });
 
   // Toggle auto-requeue

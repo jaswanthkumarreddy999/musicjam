@@ -341,18 +341,7 @@
     cursor: pointer;
 }
 
-.skip-vote-btn {
-    margin-top: 14px; width: 100%;
-    justify-content: center;
-    font-size: .82rem; padding: 8px 14px;
-    border-color: hsla(40,100%,58%,.35);
-    color: var(--yellow);
-}
-.skip-vote-btn:hover:not(:disabled) {
-    background: hsla(40,100%,58%,.1) !important;
-    border-color: var(--yellow) !important;
-}
-.skip-vote-btn:disabled { opacity: .45; cursor: not-allowed; }
+.skip-vote-btn { display: none; }
 
 /* ── Queue ── */
 .queue-section {
@@ -476,7 +465,6 @@
 }
 .queue-action-btn:hover { color: var(--txt); background: rgba(255,255,255,.08); }
 .queue-action-btn.remove:hover { color: var(--red); background: hsla(355,85%,62%,.14); }
-.queue-action-btn.upvote:hover { color: var(--green); background: var(--green-dim); }
 
 /* Drag states */
 .queue-item.dragging { opacity: .4; }
