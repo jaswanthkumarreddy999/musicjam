@@ -131,18 +131,16 @@ class RoomSocketManager {
             });
         }
 
-        // Library search
-        if (this.librarySearch) {
-            this.librarySearch.addEventListener('input', e => this.filterLibraryPanel(e.target.value));
-        }
+        // Library search (delegated)
+        document.addEventListener('input', e => {
+            if (e.target.id === 'library-search') this.filterLibraryPanel(e.target.value);
+        });
 
-        // Library panel — click ➕ to add
-        if (this.libraryPanelList) {
-            this.libraryPanelList.addEventListener('click', e => {
-                const btn = e.target.closest('.lp-add-btn');
-                if (btn) this.addToQueue(btn.dataset.songId);
-            });
-        }
+        // Library panel — click ➕ to add (delegated, works even if panel was hidden at bind time)
+        document.addEventListener('click', e => {
+            const btn = e.target.closest('.lp-add-btn');
+            if (btn) this.addToQueue(btn.dataset.songId);
+        });
 
         // Queue actions
         if (this.queueList) {
@@ -227,6 +225,8 @@ class RoomSocketManager {
                 this.showToast(`Welcome, ${this.nickname}! 🎵`, 'success');
                 document.getElementById('loading-screen').classList.add('hidden');
                 document.getElementById('room-app').classList.remove('hidden');
+                // Re-render library now that the panel is visible in the DOM
+                this.renderLibraryPanel();
             }
         });
 
@@ -483,11 +483,14 @@ class RoomSocketManager {
     }
 
     renderLibraryPanel(filtered = null) {
+        // Always look up fresh — element may have been hidden (display:none) at init time
+        const list = document.getElementById('library-panel-list');
+        if (!list) return;
+
         const songs = filtered !== null ? filtered : this.musicLibrary;
-        if (!this.libraryPanelList) return;
 
         if (songs.length === 0) {
-            this.libraryPanelList.innerHTML = `
+            list.innerHTML = `
                 <div class="lp-empty">
                     <div class="empty-icon">🎵</div>
                     <p>${filtered !== null ? 'No songs match' : 'No songs yet — upload some!'}</p>
@@ -495,7 +498,7 @@ class RoomSocketManager {
             return;
         }
 
-        this.libraryPanelList.innerHTML = songs.map(song => `
+        list.innerHTML = songs.map(song => `
             <div class="lp-song-row" data-song-id="${song.id}">
                 <div class="lp-song-info">
                     <div class="lp-song-title">${this.escapeHtml(song.title)}</div>
@@ -504,7 +507,7 @@ class RoomSocketManager {
                         <span class="lp-duration">${this.formatDuration(song.duration)}</span>
                     </div>
                 </div>
-                <button class="lp-add-btn" data-song-id="${song.id}" aria-label="Add ${this.escapeHtml(song.title)} to queue">
+                <button class="lp-add-btn" data-song-id="${song.id}" aria-label="Add to queue">
                     <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                 </button>
             </div>
