@@ -4,18 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Room - MusicJam</title>
-    <link rel="stylesheet" href="/css/style.css?v=1.4">
-    <link rel="stylesheet" href="/css/room.css?v=1.4">
+    <link rel="stylesheet" href="/css/style.css?v=3.0">
+    <link rel="stylesheet" href="/css/room.css?v=3.0">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#1db954">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- PWA Meta Tags -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="MusicJam">
 </head>
 <body>
     <!-- Loading Screen -->
@@ -26,13 +23,14 @@
                 <h1>MusicJam</h1>
             </div>
             <div class="loading-spinner"></div>
-            <p>Connecting to room...</p>
+            <p style="color:var(--txt2);font-size:.9rem;margin-top:4px;">Connecting to room…</p>
         </div>
     </div>
 
     <!-- Room App -->
     <div id="room-app" class="room-app hidden">
-        <!-- Room Header -->
+
+        <!-- Header -->
         <header class="room-header">
             <div class="container">
                 <div class="room-header-content">
@@ -41,63 +39,47 @@
                         <div class="room-details">
                             <h1 class="room-title">Room <span id="room-code-display">123456</span></h1>
                             <p class="room-status">
-                                <span id="user-count">1</span> listeners • 
+                                <span id="user-count">1</span> listeners •
                                 <span id="connection-status" class="status-connected">Connected</span>
                             </p>
-                            <!-- Listeners avatars -->
                             <div class="listeners-bar" id="listeners-bar"></div>
                         </div>
                     </div>
                     <div class="room-actions">
-                        <button id="share-room-btn" class="btn btn-outline btn-small">
-                            <span class="btn-icon">🔗</span>
-                            Share
-                        </button>
-                        <a href="/dashboard.html" class="btn btn-outline btn-small">
-                            <span class="btn-icon">📊</span>
-                            Storage
-                        </a>
-                        <button id="add-music-btn" class="btn btn-primary btn-small">
-                            <span class="btn-icon">➕</span>
-                            Add Music
-                        </button>
+                        <button id="share-room-btn" class="btn btn-outline btn-small">🔗 Share</button>
                     </div>
                 </div>
             </div>
         </header>
 
-        <!-- Main Content -->
+        <!-- Main: three-column on desktop -->
         <main class="room-main">
             <div class="container">
                 <div class="room-layout">
-                    <!-- Now Playing Section -->
+
+                    <!-- ── Player ── -->
                     <section class="now-playing">
                         <div class="now-playing-content" id="now-playing-content">
                             <div class="no-song" id="no-song-display">
                                 <div class="no-song-icon">🎵</div>
                                 <h3>No song playing</h3>
-                                <p>Add music to the queue to start jamming</p>
+                                <p>Add a song from your library →</p>
                             </div>
-                            
                             <div class="song-display hidden" id="song-display">
                                 <div class="song-artwork">
-                                    <div class="artwork-placeholder" id="song-artwork">
-                                        🎵
-                                    </div>
+                                    <div class="artwork-placeholder" id="song-artwork">🎵</div>
                                     <div class="song-info">
                                         <h2 class="song-title" id="song-title">Song Title</h2>
                                         <p class="song-artist" id="song-artist">Artist Name</p>
-                                        <p class="song-album" id="song-album">Album Name</p>
+                                        <p class="song-album" id="song-album">Album</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        
-                        <!-- Audio Player -->
+
                         <div class="audio-player" id="audio-player">
                             <audio id="audio-element" preload="metadata"></audio>
-                            
-                            <!-- Progress Bar -->
+
                             <div class="progress-section">
                                 <span class="time-display" id="current-time">0:00</span>
                                 <div class="progress-bar" id="progress-bar">
@@ -108,45 +90,28 @@
                                 </div>
                                 <span class="time-display" id="total-time">0:00</span>
                             </div>
-                            
-                            <!-- Controls -->
+
                             <div class="player-controls">
                                 <button id="repeat-btn" class="control-btn" title="Repeat: Off">
-                                    <svg viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/>
-                                    </svg>
+                                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z"/></svg>
                                     <span id="repeat-badge" class="repeat-badge" style="display:none;">1</span>
                                 </button>
-
-                                <button id="prev-btn" class="control-btn" title="Previous Song">
-                                    <svg viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
-                                    </svg>
+                                <button id="prev-btn" class="control-btn" title="Previous">
+                                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg>
                                 </button>
-                                
                                 <button id="play-pause-btn" class="control-btn control-btn-large">
-                                    <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M8 5v14l11-7z"/>
-                                    </svg>
-                                    <svg class="pause-icon hidden" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
-                                    </svg>
+                                    <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                                    <svg class="pause-icon hidden" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
                                 </button>
-                                
-                                <button id="next-btn" class="control-btn" title="Next Song">
-                                    <svg viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
-                                    </svg>
+                                <button id="next-btn" class="control-btn" title="Next">
+                                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg>
+                                </button>
+                                <button id="volume-btn" class="control-btn">
+                                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
                                 </button>
                             </div>
-                            
-                            <!-- Volume Control -->
+
                             <div class="volume-section">
-                                <button id="volume-btn" class="control-btn">
-                                    <svg class="volume-icon" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-                                    </svg>
-                                </button>
                                 <div class="volume-slider">
                                     <input type="range" id="volume-range" min="0" max="100" value="50" class="volume-input">
                                 </div>
@@ -154,65 +119,80 @@
                         </div>
                     </section>
 
-                    <!-- Queue Section -->
+                    <!-- ── Queue ── -->
                     <section class="queue-section">
                         <div class="queue-header">
-                            <h3>Queue</h3>
-                            <span class="queue-count" id="queue-count">0 songs</span>
+                            <h3>Queue <span class="queue-count" id="queue-count">0</span></h3>
+                            <div class="queue-toggles">
+                                <button id="auto-requeue-btn" class="toggle-btn" title="Auto-requeue: finished songs re-add to end of queue">
+                                    🔁 Auto
+                                </button>
+                                <button id="no-duplicates-btn" class="toggle-btn" title="No duplicates: block same song being added twice">
+                                    🚫 Dupes
+                                </button>
+                            </div>
                         </div>
-                        
-                        <div class="queue-content" id="queue-content">
+
+                        <div class="queue-content">
                             <div class="queue-empty" id="queue-empty">
                                 <div class="queue-empty-icon">📜</div>
                                 <p>Queue is empty</p>
-                                <p class="queue-empty-subtitle">Add some songs to get started</p>
+                                <p class="queue-empty-subtitle">Tap ➕ on any song</p>
                             </div>
-                            
-                            <div class="queue-list hidden" id="queue-list">
-                                <!-- Queue items will be populated here -->
-                            </div>
+                            <div class="queue-list hidden" id="queue-list"></div>
                         </div>
-                        
-                        <!-- Listeners Footer in Queue -->
-                        <div class="queue-listeners" id="queue-listeners-panel">
+
+                        <div class="queue-listeners">
                             <div class="ql-label">🎧 In this room</div>
                             <div class="ql-list" id="ql-list"></div>
                         </div>
                     </section>
-                </div>
+
+                    <!-- ── Library Panel ── -->
+                    <section class="library-panel">
+                        <div class="library-panel-header">
+                            <h3>Library</h3>
+                            <button id="room-upload-btn" class="btn btn-primary btn-small">⬆ Upload</button>
+                        </div>
+
+                        <!-- Upload zone (hidden by default) -->
+                        <div id="room-upload-zone" class="room-upload-zone hidden">
+                            <div class="room-upload-area" id="room-upload-area">
+                                <div class="upload-content">
+                                    <div class="upload-icon">🎵</div>
+                                    <p class="upload-title">Drop files or tap to browse</p>
+                                    <p class="upload-hint">MP3 · WAV · OGG · M4A · FLAC</p>
+                                </div>
+                                <input type="file" id="room-file-input" accept="audio/*" multiple style="display:none;">
+                            </div>
+                            <div id="room-upload-progress" class="upload-progress hidden">
+                                <div class="progress-bar-track">
+                                    <div class="progress-fill" id="room-progress-fill"></div>
+                                </div>
+                                <p class="progress-text" id="room-progress-text">Uploading…</p>
+                            </div>
+                        </div>
+
+                        <!-- Search -->
+                        <div class="library-search-wrap">
+                            <input type="text" id="library-search" class="search-input" placeholder="Search songs…">
+                        </div>
+
+                        <!-- Song list -->
+                        <div class="library-panel-list" id="library-panel-list">
+                            <div class="lp-empty" id="library-panel-empty">
+                                <div class="empty-icon">🎵</div>
+                                <p>No songs yet — upload some!</p>
+                            </div>
+                        </div>
+                    </section>
+
+                </div><!-- /room-layout -->
             </div>
         </main>
     </div>
 
-    <!-- Add Music Modal -->
-    <div id="add-music-modal" class="modal-overlay hidden">
-        <div class="modal modal-large">
-            <div class="modal-header">
-                <h3>Add Music to Queue</h3>
-                <button class="modal-close" data-action="close-add-music">&times;</button>
-            </div>
-            <div class="modal-content">
-                <div class="music-library-modal">
-                    <div class="library-search">
-                        <input type="text" 
-                               id="music-search" 
-                               placeholder="Search your music..." 
-                               class="search-input">
-                    </div>
-                    
-                    <div class="library-content-modal" id="library-content-modal">
-                        <div class="library-empty">
-                            <div class="empty-icon">🎵</div>
-                            <h4>No music in library</h4>
-                            <p>Go back to upload some music first</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Share Room Modal -->
+    <!-- Share Modal -->
     <div id="share-modal" class="modal-overlay hidden">
         <div class="modal">
             <div class="modal-header">
@@ -222,26 +202,20 @@
             <div class="modal-content">
                 <div class="share-content">
                     <div class="room-code-display">
-                        <label>Room Code:</label>
+                        <label>Room Code</label>
                         <div class="code-box">
                             <span id="share-room-code">123456</span>
-                            <button id="copy-share-code-btn" class="btn btn-small">Copy</button>
+                            <button id="copy-share-code-btn" class="btn btn-small btn-outline">Copy</button>
                         </div>
                     </div>
-                    
                     <div class="share-url">
-                        <label>Room URL:</label>
-                        <div class="code-box">
-                            <span id="share-room-url">https://musicjam.com/room/123456</span>
-                            <button id="copy-share-url-btn" class="btn btn-small">Copy</button>
+                        <label>Room URL</label>
+                        <div class="code-box url-box">
+                            <span id="share-room-url" class="url-text"></span>
+                            <button id="copy-share-url-btn" class="btn btn-small btn-outline">Copy</button>
                         </div>
                     </div>
-                    
-                    <div class="share-buttons">
-                        <button id="share-native-btn" class="btn btn-primary" style="display: none;">
-                            📱 Share
-                        </button>
-                    </div>
+                    <button id="share-native-btn" class="btn btn-primary" style="display:none;width:100%;margin-top:4px;">📱 Share</button>
                 </div>
             </div>
         </div>
@@ -250,19 +224,13 @@
     <!-- Nickname Modal -->
     <div id="nickname-modal" class="modal-overlay">
         <div class="modal">
-            <div class="modal-header">
-                <h3>👋 Who's joining?</h3>
-            </div>
+            <div class="modal-header"><h3>👋 Who's joining?</h3></div>
             <div class="modal-content">
-                <p style="color:var(--text-secondary);margin-bottom:1rem;">Set a display name so your friends know who you are.</p>
+                <p style="color:var(--txt2);margin-bottom:1rem;">Set a display name so your friends know who you are.</p>
                 <div class="nickname-form">
-                    <input type="text"
-                           id="nickname-input"
-                           class="search-input"
-                           placeholder="e.g. Sun Sun Bun"
-                           maxlength="24"
-                           autocomplete="off">
-                    <div class="color-picker" id="color-picker">
+                    <input type="text" id="nickname-input" class="search-input"
+                           placeholder="e.g. Sun Sun Bun" maxlength="24" autocomplete="off">
+                    <div class="color-picker">
                         <span class="color-label">Pick a color:</span>
                         <div class="color-swatches" id="color-swatches"></div>
                     </div>
@@ -274,10 +242,8 @@
         </div>
     </div>
 
-    <!-- Toast Notifications -->
     <div id="toast-container" class="toast-container"></div>
 
-    <!-- Scripts -->
     <script src="/socket.io/socket.io.js"></script>
     <script src="/js/audio-player.js"></script>
     <script src="/js/room.js"></script>

@@ -12,8 +12,9 @@ class RoomSocketManager {
         this.musicLibrary = [];
         this.hasVotedSkip = false;
         this.dragSrcIndex = null;
+        this.autoRequeue = false;
+        this.noDuplicates = false;
 
-        // Preset avatar colors
         this.COLORS = [
             '#00f59b', '#00b4d8', '#e040fb', '#ff6b6b',
             '#ffb703', '#f77f00', '#06d6a0', '#a29bfe'
@@ -27,29 +28,25 @@ class RoomSocketManager {
     initializeFromURL() {
         const pathParts = window.location.pathname.split('/');
         this.roomCode = pathParts[2];
-
         const urlParams = new URLSearchParams(window.location.search);
         this.userId = urlParams.get('userId') || this.generateUserId();
-
         if (!this.roomCode || this.roomCode.length !== 6) {
             this.showToast('Invalid room code', 'error');
             setTimeout(() => { window.location.href = '/'; }, 2000);
         }
     }
 
-    /* ── Nickname modal ────────────────────────────────── */
+    /* ── Nickname modal ── */
     showNicknameModal() {
         const modal = document.getElementById('nickname-modal');
         const swatchContainer = document.getElementById('color-swatches');
         const input = document.getElementById('nickname-input');
         const confirmBtn = document.getElementById('nickname-confirm-btn');
 
-        // Try restoring from sessionStorage for repeat visitors in same tab
         const saved = sessionStorage.getItem('mj_nickname');
         const savedColor = sessionStorage.getItem('mj_color');
         if (saved) input.value = saved;
 
-        // Build color swatches
         this.color = savedColor || this.COLORS[0];
         swatchContainer.innerHTML = this.COLORS.map(c => `
             <div class="color-swatch ${c === this.color ? 'active' : ''}"
@@ -84,28 +81,35 @@ class RoomSocketManager {
 
     initializeElements() {
         this.backBtn = document.getElementById('back-btn');
-        this.roomCodeDisplay = document.getElementById('room-code-display');
+        this.shareRoomBtn = document.getElementById('share-room-btn');
+        this.listenersBar = document.getElementById('listeners-bar');
         this.userCount = document.getElementById('user-count');
         this.connectionStatus = document.getElementById('connection-status');
-        this.shareRoomBtn = document.getElementById('share-room-btn');
-        this.addMusicBtn = document.getElementById('add-music-btn');
-        this.listenersBar = document.getElementById('listeners-bar');
-
+        this.roomCodeDisplay = document.getElementById('room-code-display');
         this.queueCount = document.getElementById('queue-count');
-        this.queueContent = document.getElementById('queue-content');
         this.queueEmpty = document.getElementById('queue-empty');
         this.queueList = document.getElementById('queue-list');
-
-        this.addMusicModal = document.getElementById('add-music-modal');
         this.shareModal = document.getElementById('share-modal');
-        this.libraryContentModal = document.getElementById('library-content-modal');
-        this.musicSearch = document.getElementById('music-search');
-
         this.shareRoomCode = document.getElementById('share-room-code');
         this.shareRoomUrl = document.getElementById('share-room-url');
         this.copyShareCodeBtn = document.getElementById('copy-share-code-btn');
         this.copyShareUrlBtn = document.getElementById('copy-share-url-btn');
         this.shareNativeBtn = document.getElementById('share-native-btn');
+        // Library panel
+        this.libraryPanelList = document.getElementById('library-panel-list');
+        this.libraryPanelEmpty = document.getElementById('library-panel-empty');
+        this.librarySearch = document.getElementById('library-search');
+        // Upload
+        this.roomUploadBtn = document.getElementById('room-upload-btn');
+        this.roomUploadZone = document.getElementById('room-upload-zone');
+        this.roomUploadArea = document.getElementById('room-upload-area');
+        this.roomFileInput = document.getElementById('room-file-input');
+        this.roomUploadProgress = document.getElementById('room-upload-progress');
+        this.roomProgressFill = document.getElementById('room-progress-fill');
+        this.roomProgressText = document.getElementById('room-progress-text');
+        // Toggles
+        this.autoRequeueBtn = document.getElementById('auto-requeue-btn');
+        this.noDuplicatesBtn = document.getElementById('no-duplicates-btn');
 
         if (this.roomCodeDisplay) this.roomCodeDisplay.textContent = this.roomCode;
     }
@@ -113,50 +117,82 @@ class RoomSocketManager {
     bindEvents() {
         if (this.backBtn) this.backBtn.addEventListener('click', () => { window.location.href = '/'; });
         if (this.shareRoomBtn) this.shareRoomBtn.addEventListener('click', () => this.showShareModal());
-        if (this.addMusicBtn) this.addMusicBtn.addEventListener('click', () => this.showAddMusicModal());
-        if (this.copyShareCodeBtn) this.copyShareCodeBtn.addEventListener('click', () => this.copyToClipboard(this.roomCode, 'Room code copied!'));
-        if (this.copyShareUrlBtn) this.copyShareUrlBtn.addEventListener('click', () => this.copyToClipboard(window.location.href, 'Room URL copied!'));
-        if (this.musicSearch) this.musicSearch.addEventListener('input', e => this.filterMusicLibrary(e.target.value));
+        if (this.copyShareCodeBtn) this.copyShareCodeBtn.addEventListener('click', () => this.copyToClipboard(this.roomCode, 'Code copied!'));
+        if (this.copyShareUrlBtn) this.copyShareUrlBtn.addEventListener('click', () => this.copyToClipboard(window.location.href, 'URL copied!'));
 
-        // Library modal: Add songs
-        if (this.libraryContentModal) {
-            this.libraryContentModal.addEventListener('click', e => {
-                if (e.target.classList.contains('add-song-btn')) {
-                    this.addToQueue(e.target.getAttribute('data-song-id'));
-                }
-            });
+        if (navigator.share && this.shareNativeBtn) {
+            this.shareNativeBtn.style.display = 'block';
+            this.shareNativeBtn.addEventListener('click', () => this.shareNative());
         }
 
-        // Queue: remove + upvote + drag-to-reorder
-        if (this.queueList) {
-            this.queueList.addEventListener('click', e => {
-                const removeBtn = e.target.closest('.queue-action-btn.remove');
-                if (removeBtn) { this.removeFromQueue(removeBtn.getAttribute('data-song-id')); return; }
-                const upvoteBtn = e.target.closest('.queue-action-btn.upvote');
-                if (upvoteBtn) { this.upvoteSong(upvoteBtn.getAttribute('data-queue-id')); return; }
-            });
-        }
-
-        // Skip vote button (injected into player controls)
-        document.addEventListener('click', e => {
-            if (e.target.id === 'skip-vote-btn') this.voteSkip();
-        });
-
-        // Modal close
-        if (this.addMusicModal) {
-            this.addMusicModal.addEventListener('click', e => {
-                if (e.target === this.addMusicModal || e.target.getAttribute('data-action') === 'close-add-music') this.closeAddMusicModal();
-            });
-        }
         if (this.shareModal) {
             this.shareModal.addEventListener('click', e => {
                 if (e.target === this.shareModal || e.target.getAttribute('data-action') === 'close-share') this.closeShareModal();
             });
         }
 
-        if (navigator.share && this.shareNativeBtn) {
-            this.shareNativeBtn.style.display = 'block';
-            this.shareNativeBtn.addEventListener('click', () => this.shareNative());
+        // Library search
+        if (this.librarySearch) {
+            this.librarySearch.addEventListener('input', e => this.filterLibraryPanel(e.target.value));
+        }
+
+        // Library panel — click ➕ to add
+        if (this.libraryPanelList) {
+            this.libraryPanelList.addEventListener('click', e => {
+                const btn = e.target.closest('.lp-add-btn');
+                if (btn) this.addToQueue(btn.dataset.songId);
+            });
+        }
+
+        // Queue actions
+        if (this.queueList) {
+            this.queueList.addEventListener('click', e => {
+                const removeBtn = e.target.closest('.queue-action-btn.remove');
+                if (removeBtn) { this.removeFromQueue(removeBtn.dataset.songId); return; }
+                const upvoteBtn = e.target.closest('.queue-action-btn.upvote');
+                if (upvoteBtn) { this.upvoteSong(upvoteBtn.dataset.queueId); return; }
+            });
+        }
+
+        // Skip vote
+        document.addEventListener('click', e => {
+            if (e.target.id === 'skip-vote-btn') this.voteSkip();
+        });
+
+        // Toggle buttons
+        if (this.autoRequeueBtn) {
+            this.autoRequeueBtn.addEventListener('click', () => {
+                this.autoRequeue = !this.autoRequeue;
+                this.socket.emit('set-auto-requeue', { enabled: this.autoRequeue });
+                this.updateToggleUI();
+            });
+        }
+        if (this.noDuplicatesBtn) {
+            this.noDuplicatesBtn.addEventListener('click', () => {
+                this.noDuplicates = !this.noDuplicates;
+                this.socket.emit('set-no-duplicates', { enabled: this.noDuplicates });
+                this.updateToggleUI();
+            });
+        }
+
+        // Upload
+        if (this.roomUploadBtn) {
+            this.roomUploadBtn.addEventListener('click', () => this.toggleUploadZone());
+        }
+        if (this.roomUploadArea) {
+            this.roomUploadArea.addEventListener('click', () => this.roomFileInput.click());
+            this.roomUploadArea.addEventListener('dragover', e => { e.preventDefault(); this.roomUploadArea.classList.add('dragover'); });
+            this.roomUploadArea.addEventListener('dragleave', () => this.roomUploadArea.classList.remove('dragover'));
+            this.roomUploadArea.addEventListener('drop', e => {
+                e.preventDefault();
+                this.roomUploadArea.classList.remove('dragover');
+                const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|flac|aac|wma)$/i.test(f.name));
+                if (files.length) this.uploadFiles(files);
+                else this.showToast('No audio files found', 'error');
+            });
+        }
+        if (this.roomFileInput) {
+            this.roomFileInput.addEventListener('change', e => this.uploadFiles(Array.from(e.target.files)));
         }
 
         document.addEventListener('keydown', e => this.handleKeyboardShortcuts(e));
@@ -169,48 +205,40 @@ class RoomSocketManager {
         return 'user_' + Math.random().toString(36).substr(2, 9);
     }
 
-    /* ── Socket ────────────────────────────────────────── */
+    /* ── Socket ── */
     initializeSocket() {
         this.socket = io();
 
-        this.socket.on('connect', () => {
-            console.log('Connected to server');
-            this.joinRoom();
-        });
+        this.socket.on('connect', () => { this.joinRoom(); });
 
-        this.socket.on('disconnect', () => {
-            this.updateConnectionStatus(false);
-        });
+        this.socket.on('disconnect', () => { this.updateConnectionStatus(false); });
 
         this.socket.on('room-joined', data => {
             if (data.success) {
                 this.isConnected = true;
                 this.roomData = data.room;
                 this.isHost = data.room.hostId === this.userId;
+                this.autoRequeue = !!data.room.autoRequeue;
+                this.noDuplicates = !!data.room.noDuplicates;
                 this.updateConnectionStatus(true);
+                this.updateToggleUI();
                 this.updateRoomState(data.room);
                 this.renderListeners(data.room.userList || []);
                 this.showToast(`Welcome, ${this.nickname}! 🎵`, 'success');
-                
-                // Hide loading screen and show room app
-                const loader = document.getElementById('loading-screen');
-                if (loader) loader.classList.add('hidden');
-                const app = document.getElementById('room-app');
-                if (app) app.classList.remove('hidden');
+                document.getElementById('loading-screen').classList.add('hidden');
+                document.getElementById('room-app').classList.remove('hidden');
             }
         });
 
         this.socket.on('user-joined', data => {
             this.updateUserCount(data.userCount);
             this.renderListeners(data.userList || []);
-            const name = data.nickname || 'Someone';
-            this.showToast(`${name} joined the room 👋`, 'info');
+            this.showToast(`${data.nickname || 'Someone'} joined 👋`, 'info');
         });
 
         this.socket.on('user-left', data => {
             this.updateUserCount(data.userCount);
             this.renderListeners(data.userList || []);
-            this.showToast('Someone left the room', 'info');
         });
 
         this.socket.on('queue-updated', data => { this.updateQueue(data.queue); });
@@ -221,7 +249,6 @@ class RoomSocketManager {
             this.audioPlayer.syncPlayback(data.currentTime, !this.audioPlayer.audio.paused, data.timestamp);
         });
 
-        // Skip vote updates
         this.socket.on('skip-vote-update', data => {
             const btn = document.getElementById('skip-vote-btn');
             if (btn) btn.textContent = `⏭ Skip (${data.votes}/${data.needed})`;
@@ -234,15 +261,28 @@ class RoomSocketManager {
             if (btn) { btn.textContent = '⏭ Vote Skip'; btn.disabled = false; }
         });
 
-        this.socket.on('error', data => { this.showToast(data.message || 'An error occurred', 'error'); });
-
         this.socket.on('repeat-mode-updated', data => {
             if (this.roomData) this.roomData.repeatMode = data.repeatMode;
             if (this.audioPlayer) this.audioPlayer.updateRepeatUI(data.repeatMode);
         });
 
+        this.socket.on('room-settings-updated', data => {
+            this.autoRequeue = !!data.autoRequeue;
+            this.noDuplicates = !!data.noDuplicates;
+            this.updateToggleUI();
+        });
+
+        // New song uploaded by anyone in the room — refresh library panel live
+        this.socket.on('library-updated', data => {
+            this.musicLibrary.unshift(data.song);
+            this.renderLibraryPanel();
+            this.showToast(`"${data.song.title}" added to library 🎵`, 'info');
+        });
+
+        this.socket.on('error', data => { this.showToast(data.message || 'An error occurred', 'error'); });
+
         this.socket.on('room-deleted', () => {
-            this.showToast('Room has been deleted by the host', 'error');
+            this.showToast('Room deleted by host', 'error');
             setTimeout(() => { window.location.href = '/'; }, 3000);
         });
     }
@@ -268,11 +308,21 @@ class RoomSocketManager {
         if (this.userCount) this.userCount.textContent = count;
     }
 
-    /* ── Listeners bar & panel ─────────────────────────── */
-    renderListeners(userList) {
-        if (!userList || !userList.length) return;
+    /* ── Toggle buttons UI ── */
+    updateToggleUI() {
+        if (this.autoRequeueBtn) {
+            this.autoRequeueBtn.classList.toggle('toggle-active', this.autoRequeue);
+            this.autoRequeueBtn.title = `Auto-requeue: ${this.autoRequeue ? 'ON' : 'OFF'} — finished songs rejoin queue`;
+        }
+        if (this.noDuplicatesBtn) {
+            this.noDuplicatesBtn.classList.toggle('toggle-active', this.noDuplicates);
+            this.noDuplicatesBtn.title = `No duplicates: ${this.noDuplicates ? 'ON' : 'OFF'} — same song can't be queued twice`;
+        }
+    }
 
-        // Header mini-avatars
+    /* ── Listeners ── */
+    renderListeners(userList) {
+        if (!userList) return;
         if (this.listenersBar) {
             this.listenersBar.innerHTML = userList.slice(0, 8).map(u => `
                 <div class="listener-avatar" style="background:${u.color};" title="${this.escapeHtml(u.nickname)}">
@@ -280,8 +330,6 @@ class RoomSocketManager {
                 </div>
             `).join('') + (userList.length > 8 ? `<div class="listener-avatar more">+${userList.length - 8}</div>` : '');
         }
-
-        // Listeners panel inside queue section
         const qlList = document.getElementById('ql-list');
         if (qlList) {
             qlList.innerHTML = userList.map(u => `
@@ -305,22 +353,20 @@ class RoomSocketManager {
         }
         this.updateQueue(roomData.queue);
         if (roomData.userList) this.renderListeners(roomData.userList);
-        
-        // Sync repeat states and back button
         if (roomData.repeatMode !== undefined) this.audioPlayer.updateRepeatUI(roomData.repeatMode);
         if (roomData.hasPrev !== undefined) this.audioPlayer.updatePrevButton(roomData.hasPrev);
     }
 
-    /* ── Skip Vote ─────────────────────────────────────── */
+    /* ── Skip vote ── */
     injectSkipVoteBtn() {
         if (document.getElementById('skip-vote-btn')) return;
-        const volumeSection = document.querySelector('.volume-section');
-        if (!volumeSection) return;
+        const vs = document.querySelector('.volume-section');
+        if (!vs) return;
         const btn = document.createElement('button');
         btn.id = 'skip-vote-btn';
         btn.className = 'btn btn-secondary btn-small skip-vote-btn';
         btn.textContent = '⏭ Vote Skip';
-        volumeSection.after(btn);
+        vs.after(btn);
     }
 
     voteSkip() {
@@ -331,17 +377,16 @@ class RoomSocketManager {
         if (btn) { btn.textContent = '✓ Voted'; btn.disabled = true; }
     }
 
-    /* ── Queue ─────────────────────────────────────────── */
+    /* ── Queue ── */
     updateQueue(queue) {
         if (!this.queueCount) return;
-        this.queueCount.textContent = `${queue.length} song${queue.length !== 1 ? 's' : ''}`;
+        this.queueCount.textContent = queue.length;
 
         if (queue.length === 0) {
             this.queueEmpty.classList.remove('hidden');
             this.queueList.classList.add('hidden');
             return;
         }
-
         this.queueEmpty.classList.add('hidden');
         this.queueList.classList.remove('hidden');
 
@@ -353,9 +398,7 @@ class RoomSocketManager {
                     <div class="queue-song-title">${this.escapeHtml(song.title)}</div>
                     <div class="queue-song-artist">${this.escapeHtml(song.artist)}</div>
                 </div>
-                <div class="queue-vote-count" title="Upvotes">
-                    ▲ ${song.votes || 0}
-                </div>
+                <div class="queue-vote-count" title="Upvotes">▲ ${song.votes || 0}</div>
                 <div class="queue-actions">
                     <button class="queue-action-btn upvote" data-queue-id="${song.id}" title="Upvote">▲</button>
                     <button class="queue-action-btn remove" data-song-id="${song.id}" title="Remove">✕</button>
@@ -366,47 +409,36 @@ class RoomSocketManager {
         this.bindDragToReorder();
     }
 
-    /* ── Feature 3: Drag-to-reorder ────────────────────── */
     bindDragToReorder() {
         const items = this.queueList.querySelectorAll('.queue-item');
-
         items.forEach(item => {
             item.addEventListener('dragstart', e => {
                 this.dragSrcIndex = parseInt(item.dataset.index);
                 item.classList.add('dragging');
                 e.dataTransfer.effectAllowed = 'move';
             });
-
             item.addEventListener('dragend', () => {
                 item.classList.remove('dragging');
                 this.queueList.querySelectorAll('.queue-item').forEach(i => i.classList.remove('drag-over'));
             });
-
             item.addEventListener('dragover', e => {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
                 this.queueList.querySelectorAll('.queue-item').forEach(i => i.classList.remove('drag-over'));
                 item.classList.add('drag-over');
             });
-
             item.addEventListener('drop', e => {
                 e.preventDefault();
                 const destIndex = parseInt(item.dataset.index);
                 if (this.dragSrcIndex !== null && this.dragSrcIndex !== destIndex) {
-                    this.socket.emit('reorder-queue', {
-                        fromIndex: this.dragSrcIndex,
-                        toIndex: destIndex
-                    });
+                    this.socket.emit('reorder-queue', { fromIndex: this.dragSrcIndex, toIndex: destIndex });
                 }
                 this.dragSrcIndex = null;
             });
         });
     }
 
-    /* ── Feature 2: Upvoting ───────────────────────────── */
-    upvoteSong(queueItemId) {
-        this.socket.emit('upvote-song', { queueItemId });
-    }
+    upvoteSong(queueItemId) { this.socket.emit('upvote-song', { queueItemId }); }
 
     handlePlaybackState(data) {
         if (data.currentSong) {
@@ -417,8 +449,6 @@ class RoomSocketManager {
         else { this.audioPlayer.pause(); }
         if (data.currentTime !== undefined) this.audioPlayer.seek(data.currentTime);
         if (data.queue) this.updateQueue(data.queue);
-
-        // Sync repeat states and back button status
         if (data.repeatMode !== undefined) {
             if (this.roomData) this.roomData.repeatMode = data.repeatMode;
             this.audioPlayer.updateRepeatUI(data.repeatMode);
@@ -426,108 +456,156 @@ class RoomSocketManager {
         if (data.hasPrev !== undefined) this.audioPlayer.updatePrevButton(data.hasPrev);
     }
 
-    /* ── Audio control methods ─────────────────────────── */
     play()    { this.socket.emit('play'); }
     pause()   { this.socket.emit('pause'); }
     seek(t)   { this.socket.emit('seek', { time: t }); }
     nextSong(){ this.socket.emit('next-song'); }
 
-    /* ── Queue management ──────────────────────────────── */
     addToQueue(songId) {
         if (!this.socket || !this.isConnected) { this.showToast('Not connected to room', 'error'); return; }
         this.socket.emit('add-to-queue', { songId });
-        this.closeAddMusicModal();
-        this.showToast('Added to queue! 🎵', 'success');
     }
 
     removeFromQueue(songId) {
         this.socket.emit('remove-from-queue', { songId });
     }
 
-    /* ── Music library ─────────────────────────────────── */
+    /* ── Library panel ── */
     async loadMusicLibrary() {
         try {
             const res = await fetch('/api/library');
             const data = await res.json();
-            if (data.success) { this.musicLibrary = data.songs; this.renderMusicLibrary(); }
-        } catch (e) { console.error('Error loading music library:', e); }
+            if (data.success) {
+                this.musicLibrary = data.songs;
+                this.renderLibraryPanel();
+            }
+        } catch (e) { console.error('Error loading library:', e); }
     }
 
-    renderMusicLibrary(filteredSongs = null) {
-        const songs = filteredSongs || this.musicLibrary;
+    renderLibraryPanel(filtered = null) {
+        const songs = filtered !== null ? filtered : this.musicLibrary;
+        if (!this.libraryPanelList) return;
+
         if (songs.length === 0) {
-            this.libraryContentModal.innerHTML = `
-                <div class="library-empty">
+            this.libraryPanelList.innerHTML = `
+                <div class="lp-empty">
                     <div class="empty-icon">🎵</div>
-                    <h4>No music found</h4>
-                    <p>${filteredSongs ? 'No songs match your search' : 'Go back to upload some music first'}</p>
+                    <p>${filtered !== null ? 'No songs match' : 'No songs yet — upload some!'}</p>
                 </div>`;
             return;
         }
-        this.libraryContentModal.innerHTML = songs.map(song => `
-            <div class="library-song-item" data-song-id="${song.id}">
-                <div class="library-song-info">
-                    <div class="library-song-title">${this.escapeHtml(song.title)}</div>
-                    <div class="library-song-meta">
-                        <span class="library-song-artist">${this.escapeHtml(song.artist)}</span>
-                        <span class="library-song-duration">${this.formatDuration(song.duration)}</span>
+
+        this.libraryPanelList.innerHTML = songs.map(song => `
+            <div class="lp-song-row" data-song-id="${song.id}">
+                <div class="lp-song-info">
+                    <div class="lp-song-title">${this.escapeHtml(song.title)}</div>
+                    <div class="lp-song-meta">
+                        <span class="lp-artist">${this.escapeHtml(song.artist)}</span>
+                        <span class="lp-duration">${this.formatDuration(song.duration)}</span>
                     </div>
                 </div>
-                <button class="add-song-btn" data-song-id="${song.id}">Add</button>
+                <button class="lp-add-btn" data-song-id="${song.id}" aria-label="Add ${this.escapeHtml(song.title)} to queue">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 13H13v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                </button>
             </div>
         `).join('');
     }
 
-    filterMusicLibrary(term) {
-        if (!term.trim()) { this.renderMusicLibrary(); return; }
+    filterLibraryPanel(term) {
+        if (!term.trim()) { this.renderLibraryPanel(); return; }
         const t = term.toLowerCase();
-        this.renderMusicLibrary(this.musicLibrary.filter(s =>
+        this.renderLibraryPanel(this.musicLibrary.filter(s =>
             s.title.toLowerCase().includes(t) ||
             s.artist.toLowerCase().includes(t) ||
-            s.album.toLowerCase().includes(t)
+            (s.album || '').toLowerCase().includes(t)
         ));
     }
 
-    /* ── Modals ────────────────────────────────────────── */
-    showAddMusicModal() {
-        if (this.addMusicModal) {
-            this.addMusicModal.classList.remove('hidden');
-            this.loadMusicLibrary();
-            if (this.musicSearch) this.musicSearch.focus();
-        }
+    /* ── Upload from room ── */
+    toggleUploadZone() {
+        const hidden = this.roomUploadZone.classList.contains('hidden');
+        this.roomUploadZone.classList.toggle('hidden', !hidden);
+        this.roomUploadBtn.textContent = hidden ? '✕ Cancel' : '⬆ Upload';
     }
-    closeAddMusicModal() {
-        if (this.addMusicModal) {
-            this.addMusicModal.classList.add('hidden');
-            if (this.musicSearch) this.musicSearch.value = '';
-        }
-    }
-    showShareModal() {
-        this.shareRoomCode.textContent = this.roomCode;
-        this.shareRoomUrl.textContent = window.location.href;
-        this.shareModal.classList.remove('hidden');
-    }
-    closeShareModal() { this.shareModal.classList.add('hidden'); }
 
-    async copyToClipboard(text, successMessage) {
+    async uploadFiles(files) {
+        if (!files.length) return;
+        this.roomUploadZone.classList.remove('hidden');
+        this.roomUploadArea.style.display = 'none';
+        this.roomUploadProgress.classList.remove('hidden');
+        this.roomUploadBtn.textContent = 'Uploading…';
+
+        let uploaded = 0;
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            this.roomProgressText.textContent = `${file.name} (${i + 1}/${files.length})`;
+            try {
+                await this.uploadSingleFile(file, pct => {
+                    this.roomProgressFill.style.width = `${((uploaded + pct / 100) / files.length) * 100}%`;
+                });
+                uploaded++;
+            } catch (e) {
+                this.showToast(`Failed: ${file.name}`, 'error');
+            }
+        }
+
+        setTimeout(() => {
+            this.roomUploadProgress.classList.add('hidden');
+            this.roomUploadArea.style.display = '';
+            this.roomProgressFill.style.width = '0%';
+            this.roomFileInput.value = '';
+            this.roomUploadZone.classList.add('hidden');
+            this.roomUploadBtn.textContent = '⬆ Upload';
+            // library-updated socket event will refresh panel for all users
+        }, 800);
+    }
+
+    uploadSingleFile(file, onProgress) {
+        return new Promise((resolve, reject) => {
+            const fd = new FormData();
+            fd.append('audio', file);
+            const xhr = new XMLHttpRequest();
+            xhr.upload.addEventListener('progress', e => {
+                if (e.lengthComputable) onProgress((e.loaded / e.total) * 100);
+            });
+            xhr.addEventListener('load', () => {
+                if (xhr.status === 200) {
+                    const r = JSON.parse(xhr.responseText);
+                    r.success ? resolve(r.song) : reject(new Error(r.message));
+                } else { reject(new Error(`HTTP ${xhr.status}`)); }
+            });
+            xhr.addEventListener('error', () => reject(new Error('Network error')));
+            xhr.open('POST', '/api/upload');
+            xhr.send(fd);
+        });
+    }
+
+    /* ── Share modal ── */
+    showShareModal() {
+        if (this.shareRoomCode) this.shareRoomCode.textContent = this.roomCode;
+        if (this.shareRoomUrl) this.shareRoomUrl.textContent = window.location.href;
+        if (this.shareModal) this.shareModal.classList.remove('hidden');
+    }
+    closeShareModal() { if (this.shareModal) this.shareModal.classList.add('hidden'); }
+
+    async copyToClipboard(text, msg) {
         try {
             if (navigator.clipboard && window.isSecureContext) {
                 await navigator.clipboard.writeText(text);
             } else {
                 const ta = document.createElement('textarea');
-                ta.value = text;
-                ta.style.position = 'fixed'; ta.style.left = '-999999px';
+                ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px';
                 document.body.appendChild(ta); ta.focus(); ta.select();
                 document.execCommand('copy'); ta.remove();
             }
-            this.showToast(successMessage, 'success');
-        } catch (e) { this.showToast('Failed to copy', 'error'); }
+            this.showToast(msg, 'success');
+        } catch { this.showToast('Failed to copy', 'error'); }
     }
 
     async shareNative() {
         if (navigator.share) {
-            try { await navigator.share({ title: 'Join my MusicJam room!', text: `Join room ${this.roomCode} on MusicJam`, url: window.location.href }); }
-            catch (e) {}
+            try { await navigator.share({ title: 'Join my MusicJam room!', text: `Room ${this.roomCode}`, url: window.location.href }); }
+            catch {}
         }
     }
 
@@ -536,12 +614,10 @@ class RoomSocketManager {
         switch (e.code) {
             case 'Space': e.preventDefault(); this.audioPlayer.handlePlayPause(); break;
             case 'ArrowRight': if (e.ctrlKey || e.metaKey) { e.preventDefault(); this.nextSong(); } break;
-            case 'KeyM': if (e.ctrlKey || e.metaKey) { e.preventDefault(); this.showAddMusicModal(); } break;
-            case 'KeyS': if (e.ctrlKey || e.metaKey) { e.preventDefault(); this.showShareModal(); } break;
         }
     }
 
-    /* ── Utilities ─────────────────────────────────────── */
+    /* ── Utilities ── */
     formatDuration(s) {
         if (!s) return '0:00';
         return `${Math.floor(s / 60)}:${Math.floor(s % 60).toString().padStart(2, '0')}`;
@@ -563,21 +639,19 @@ class RoomSocketManager {
     }
 }
 
-// Initialize room when DOM is loaded
+// Init
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
         try {
             window.roomManager = new RoomSocketManager();
         } catch (error) {
-            console.error('Failed to initialize room manager:', error);
+            console.error('Failed to init room:', error);
             document.body.innerHTML = `
-                <div style="padding:20px;text-align:center;color:#fff;background:#121212;min-height:100vh;">
-                    <h1>🎵 MusicJam Room</h1>
-                    <h2>Initialization Error</h2>
-                    <p>There was a problem loading the room. Please refresh.</p>
-                    <p style="color:#ff4444;font-family:monospace;font-size:12px;margin-top:20px;">${error.message}</p>
-                    <button onclick="window.location.reload()" style="padding:10px 20px;margin-top:20px;background:#1db954;color:white;border:none;border-radius:5px;cursor:pointer;">Refresh Page</button>
-                    <a href="/" style="display:block;margin-top:10px;color:#1db954;text-decoration:none;">← Back to Home</a>
+                <div style="padding:20px;text-align:center;color:#fff;background:#0a0918;min-height:100vh;">
+                    <h1>🎵 MusicJam</h1>
+                    <p style="color:#ff4444;margin:16px 0;">${error.message}</p>
+                    <button onclick="location.reload()" style="padding:10px 20px;background:#00f59b;color:#000;border:none;border-radius:8px;cursor:pointer;font-weight:700;">Retry</button>
+                    <a href="/" style="display:block;margin-top:10px;color:#00f59b;">← Home</a>
                 </div>`;
         }
     }, 100);

@@ -232,6 +232,8 @@ class Room {
     this.skipVotes = new Set();   // socket IDs that voted to skip
     this.history = [];            // played songs history
     this.repeatMode = 'none';     // 'none' | 'one' | 'queue'
+    this.autoRequeue = false;     // re-add finished songs to end of queue
+    this.noDuplicates = false;    // block duplicate songs in queue
   }
 
   addUser(userId, meta = {}) {
@@ -257,14 +259,22 @@ class Room {
   }
 
   addToQueue(song) {
+    // noDuplicates: check by originalSongId (the library song id, not queue item id)
+    if (this.noDuplicates) {
+      const exists = this.queue.some(q => q.originalSongId === song.id || q.originalSongId === song.originalSongId);
+      const isCurrent = this.currentSong && (this.currentSong.originalSongId === song.id || this.currentSong.id === song.id);
+      if (exists || isCurrent) return { added: false, reason: 'duplicate' };
+    }
     this.queue.push({
       id: uuidv4(),
+      originalSongId: song.id,
       ...song,
       addedBy: song.addedBy,
       addedAt: Date.now(),
       votes: 0,
       voters: []
     });
+    return { added: true };
   }
 
   upvoteSong(queueItemId, socketId) {
@@ -303,15 +313,33 @@ class Room {
       return this.currentSong;
     }
 
+    // autoRequeue: push finished song to end of queue before advancing
+    if (this.autoRequeue && this.currentSong && this.repeatMode !== 'one') {
+      this.queue.push({
+        id: uuidv4(),
+        originalSongId: this.currentSong.originalSongId || this.currentSong.id,
+        title: this.currentSong.title,
+        artist: this.currentSong.artist,
+        album: this.currentSong.album,
+        duration: this.currentSong.duration,
+        filename: this.currentSong.filename,
+        path: this.currentSong.path,
+        addedBy: this.currentSong.addedBy,
+        votes: 0,
+        voters: []
+      });
+    }
+
     if (this.currentSong) {
       this.history.push({ ...this.currentSong });
       if (this.history.length > 50) this.history.shift();
     }
 
     if (this.queue.length > 0) {
-      if (this.repeatMode === 'queue' && this.currentSong) {
+      if (this.repeatMode === 'queue' && this.currentSong && !this.autoRequeue) {
         this.queue.push({
           id: uuidv4(),
+          originalSongId: this.currentSong.originalSongId || this.currentSong.id,
           title: this.currentSong.title,
           artist: this.currentSong.artist,
           album: this.currentSong.album,
@@ -404,7 +432,9 @@ class Room {
       currentTime: this.getCurrentTime(),
       userCount: this.users.size,
       repeatMode: this.repeatMode,
-      hasPrev: this.history.length > 0
+      hasPrev: this.history.length > 0,
+      autoRequeue: this.autoRequeue,
+      noDuplicates: this.noDuplicates
     };
   }
 }
@@ -574,11 +604,13 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
     };
     
     songs.set(song.id, song);
-    console.log('Song saved successfully:', song.title);
-    
+
     // Save to persistent storage
-    saveSongsToDB();
-    
+    await saveSongsToDB();
+
+    // Broadcast to all connected sockets that library changed
+    io.emit('library-updated', { song });
+
     res.json({
       success: true,
       song: song
@@ -809,38 +841,29 @@ io.on('connection', (socket) => {
   });
   
   socket.on('add-to-queue', (data) => {
-    console.log('add-to-queue request received:', data);
     const { songId } = data;
     const user = users.get(socket.id);
-    
-    console.log('User info:', user);
-    console.log('Current room:', socket.currentRoom);
-    
+
     if (!user || !socket.currentRoom) {
-      console.log('Error: Not in a room');
       socket.emit('error', { message: 'Not in a room' });
       return;
     }
-    
+
     const room = rooms.get(socket.currentRoom);
     const song = songs.get(songId);
-    
-    console.log('Room found:', !!room);
-    console.log('Song found:', !!song);
-    
+
     if (!room || !song) {
-      console.log('Error: Room or song not found');
       socket.emit('error', { message: 'Room or song not found' });
       return;
     }
-    
-    console.log('Adding song to queue:', song.title);
-    room.addToQueue({
-      ...song,
-      addedBy: user.userId
-    });
-    
-    console.log('Queue updated, emitting to room:', socket.currentRoom);
+
+    const result = room.addToQueue({ ...song, addedBy: user.userId });
+
+    if (!result.added) {
+      socket.emit('error', { message: 'Song already in queue (duplicates blocked)' });
+      return;
+    }
+
     io.to(socket.currentRoom).emit('queue-updated', {
       queue: room.queue
     });
@@ -1044,6 +1067,28 @@ io.on('connection', (socket) => {
       });
       io.to(socket.currentRoom).emit('skip-vote-passed', {});
     }
+  });
+
+  // Toggle auto-requeue
+  socket.on('set-auto-requeue', (data) => {
+    const room = rooms.get(socket.currentRoom);
+    if (!room) return;
+    room.autoRequeue = !!data.enabled;
+    io.to(socket.currentRoom).emit('room-settings-updated', {
+      autoRequeue: room.autoRequeue,
+      noDuplicates: room.noDuplicates
+    });
+  });
+
+  // Toggle no-duplicates
+  socket.on('set-no-duplicates', (data) => {
+    const room = rooms.get(socket.currentRoom);
+    if (!room) return;
+    room.noDuplicates = !!data.enabled;
+    io.to(socket.currentRoom).emit('room-settings-updated', {
+      autoRequeue: room.autoRequeue,
+      noDuplicates: room.noDuplicates
+    });
   });
 
   socket.on('disconnect', () => {
