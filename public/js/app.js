@@ -303,45 +303,67 @@ class MusicJamApp {
     
     async uploadFiles(files) {
         if (files.length === 0) return;
-        
+
+        // ── Duplicate detection (client-side) ──
+        // Compare by normalised filename against existing library
+        const existingNames = new Set(
+            this.musicLibrary.map(s => (s.originalName || s.title || '').toLowerCase().trim())
+        );
+        const dupes = [];
+        const toUpload = [];
+        for (const file of files) {
+            const name = file.name.toLowerCase().trim();
+            // Match on filename without extension OR exact filename
+            const noExt = name.replace(/\.[^.]+$/, '');
+            if (existingNames.has(name) || existingNames.has(noExt)) {
+                dupes.push(file.name);
+            } else {
+                toUpload.push(file);
+            }
+        }
+
+        if (dupes.length > 0) {
+            this.showToast(`Skipped ${dupes.length} duplicate${dupes.length > 1 ? 's' : ''}: ${dupes.slice(0, 2).join(', ')}${dupes.length > 2 ? '…' : ''}`, 'warning');
+        }
+        if (toUpload.length === 0) {
+            this.showToast('All selected files already exist in your library', 'info');
+            return;
+        }
+
         this.uploadProgress.classList.remove('hidden');
         this.uploadArea.style.display = 'none';
-        
+
         let uploadedCount = 0;
-        const totalFiles = files.length;
-        
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            
+        const totalFiles = toUpload.length;
+
+        for (let i = 0; i < toUpload.length; i++) {
+            const file = toUpload[i];
+
             try {
-                this.progressText.textContent = `Uploading ${file.name}... (${i + 1}/${totalFiles})`;
-                
+                this.progressText.textContent = `Uploading ${file.name}… (${i + 1}/${totalFiles})`;
+
                 await this.uploadSingleFile(file, (progress) => {
                     const totalProgress = ((uploadedCount + progress / 100) / totalFiles) * 100;
                     this.progressFill.style.width = `${totalProgress}%`;
                 });
-                
+
                 uploadedCount++;
                 this.showToast(`Uploaded: ${file.name}`, 'success');
-                
+
             } catch (error) {
                 console.error(`Failed to upload ${file.name}:`, error);
-                this.showToast(`Failed to upload ${file.name}: ${error.message}`, 'error');
+                this.showToast(`Failed: ${file.name} — ${error.message}`, 'error');
             }
         }
-        
+
         // Reset upload UI
         setTimeout(() => {
             this.uploadProgress.classList.add('hidden');
             this.uploadArea.style.display = '';
             this.progressFill.style.width = '0%';
             this.fileInput.value = '';
-
-            // Reset upload button
             this.uploadSection.classList.add('hidden');
             this.uploadBtn.innerHTML = '<span>➕</span> Upload';
-
-            // Reload library
             this.loadMusicLibrary();
         }, 1000);
     }
@@ -361,15 +383,14 @@ class MusicJamApp {
             });
             
             xhr.addEventListener('load', () => {
-                if (xhr.status === 200) {
-                    const response = JSON.parse(xhr.responseText);
-                    if (response.success) {
-                        resolve(response.song);
-                    } else {
-                        reject(new Error(response.message || 'Upload failed'));
-                    }
+                const response = JSON.parse(xhr.responseText);
+                if (xhr.status === 409) {
+                    // Server-side duplicate — resolve silently (client already warned)
+                    resolve(null);
+                } else if (xhr.status === 200 && response.success) {
+                    resolve(response.song);
                 } else {
-                    reject(new Error(`HTTP ${xhr.status}`));
+                    reject(new Error(response.message || `HTTP ${xhr.status}`));
                 }
             });
             
@@ -615,19 +636,29 @@ class MusicJamApp {
     renderHomeLibrary() {
         const libraryList = document.getElementById('library-list');
         const noLibrary = document.getElementById('no-library');
-        
+
         if (!libraryList || !noLibrary) return;
-        
+
         if (this.musicLibrary.length === 0) {
             libraryList.innerHTML = '';
             noLibrary.classList.remove('hidden');
+            // Hide bulk actions
+            const ba = document.getElementById('bulk-actions');
+            if (ba) ba.classList.add('hidden');
             return;
         }
-        
+
         noLibrary.classList.add('hidden');
-        
+
+        // Show / update bulk action bar
+        this.renderBulkActionBar();
+
         libraryList.innerHTML = this.musicLibrary.map(song => `
-            <div class="library-song-card">
+            <div class="library-song-card" data-song-id="${song.id}">
+                <label class="song-checkbox-wrap">
+                    <input type="checkbox" class="song-checkbox" data-song-id="${song.id}" data-filename="${this.escapeHtml(song.filename)}" data-title="${this.escapeHtml(song.title)}">
+                    <span class="checkbox-custom"></span>
+                </label>
                 <div class="library-song-icon">🎵</div>
                 <div class="library-song-info">
                     <div class="library-song-title">${this.escapeHtml(song.title)}</div>
@@ -636,31 +667,119 @@ class MusicJamApp {
                         <span class="meta-duration">${this.formatDuration(song.duration)}</span>
                     </div>
                 </div>
-                <button class="btn-delete delete-song-btn" data-song-id="${song.id}" aria-label="Delete ${this.escapeHtml(song.title)}">
-                    🗑️
-                </button>
+                <div class="song-card-actions">
+                    <button class="btn-icon-action download-song-btn" data-filename="${this.escapeHtml(song.filename)}" data-title="${this.escapeHtml(song.title)}" title="Download">
+                        ⬇️
+                    </button>
+                    <button class="btn-delete delete-song-btn" data-song-id="${song.id}" aria-label="Delete ${this.escapeHtml(song.title)}">
+                        🗑️
+                    </button>
+                </div>
             </div>
         `).join('');
-        
-        // Add event listeners for delete buttons
+
         this.bindLibraryActions();
+    }
+
+    renderBulkActionBar() {
+        // Create bar if not exists
+        let bar = document.getElementById('bulk-actions');
+        if (!bar) {
+            bar = document.createElement('div');
+            bar.id = 'bulk-actions';
+            bar.className = 'bulk-actions';
+            bar.innerHTML = `
+                <label class="bulk-select-all-wrap">
+                    <input type="checkbox" id="select-all-songs">
+                    <span class="checkbox-custom"></span>
+                    <span class="bulk-select-label">Select all</span>
+                </label>
+                <span class="bulk-selected-count" id="bulk-selected-count"></span>
+                <div class="bulk-btns">
+                    <button id="download-selected-btn" class="btn btn-outline btn-small" disabled>⬇️ Download selected</button>
+                    <button id="download-all-btn" class="btn btn-ghost btn-small">⬇️ Download all</button>
+                </div>
+            `;
+            // Insert before library-list
+            const libraryList = document.getElementById('library-list');
+            libraryList.parentNode.insertBefore(bar, libraryList);
+        }
+        bar.classList.remove('hidden');
+
+        // Wire up events (replace node to avoid duplicate listeners)
+        const newBar = bar.cloneNode(true);
+        bar.parentNode.replaceChild(newBar, bar);
+
+        newBar.querySelector('#select-all-songs').addEventListener('change', (e) => {
+            document.querySelectorAll('.song-checkbox').forEach(cb => { cb.checked = e.target.checked; });
+            this.updateBulkUI();
+        });
+        newBar.querySelector('#download-selected-btn').addEventListener('click', () => this.downloadSelected());
+        newBar.querySelector('#download-all-btn').addEventListener('click', () => this.downloadAll());
+    }
+
+    updateBulkUI() {
+        const checked = document.querySelectorAll('.song-checkbox:checked');
+        const total = document.querySelectorAll('.song-checkbox');
+        const countEl = document.getElementById('bulk-selected-count');
+        const dlBtn = document.getElementById('download-selected-btn');
+        const selectAll = document.getElementById('select-all-songs');
+
+        if (countEl) countEl.textContent = checked.length > 0 ? `${checked.length} selected` : '';
+        if (dlBtn) dlBtn.disabled = checked.length === 0;
+        if (selectAll) {
+            selectAll.indeterminate = checked.length > 0 && checked.length < total.length;
+            selectAll.checked = total.length > 0 && checked.length === total.length;
+        }
+    }
+
+    async downloadSelected() {
+        const checked = [...document.querySelectorAll('.song-checkbox:checked')];
+        if (!checked.length) return;
+        this.showToast(`Downloading ${checked.length} song${checked.length > 1 ? 's' : ''}…`, 'info');
+        for (const cb of checked) {
+            await this._triggerDownload(cb.dataset.filename, cb.dataset.title);
+        }
+    }
+
+    async downloadAll() {
+        if (!this.musicLibrary.length) return;
+        this.showToast(`Downloading all ${this.musicLibrary.length} songs…`, 'info');
+        for (const song of this.musicLibrary) {
+            await this._triggerDownload(song.filename, song.title);
+        }
+    }
+
+    _triggerDownload(filename, title) {
+        return new Promise(resolve => {
+            const a = document.createElement('a');
+            a.href = `/uploads/${encodeURIComponent(filename)}`;
+            a.download = title ? `${title}${filename.match(/\.[^.]+$/)?.[0] || '.mp3'}` : filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            // Small delay so browser doesn't block multiple downloads
+            setTimeout(resolve, 400);
+        });
     }
     
     bindLibraryActions() {
         const libraryList = document.getElementById('library-list');
         if (!libraryList) return;
-        
-        // Remove existing listeners by cloning the element
-        const newLibraryList = libraryList.cloneNode(true);
-        libraryList.parentNode.replaceChild(newLibraryList, libraryList);
-        
-        // Add event delegation for delete buttons
-        newLibraryList.addEventListener('click', (e) => {
-            const btn = e.target.closest('.delete-song-btn');
-            if (btn) {
-                const songId = btn.getAttribute('data-song-id');
-                this.deleteSong(songId);
-            }
+
+        const newList = libraryList.cloneNode(true);
+        libraryList.parentNode.replaceChild(newList, libraryList);
+
+        newList.addEventListener('click', (e) => {
+            const deleteBtn = e.target.closest('.delete-song-btn');
+            if (deleteBtn) { this.deleteSong(deleteBtn.dataset.songId); return; }
+
+            const dlBtn = e.target.closest('.download-song-btn');
+            if (dlBtn) { this._triggerDownload(dlBtn.dataset.filename, dlBtn.dataset.title); return; }
+        });
+
+        newList.addEventListener('change', (e) => {
+            if (e.target.classList.contains('song-checkbox')) this.updateBulkUI();
         });
     }
     

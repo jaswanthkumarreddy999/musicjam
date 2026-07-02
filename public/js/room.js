@@ -595,10 +595,16 @@ class RoomSocketManager {
                 if (e.lengthComputable) onProgress((e.loaded / e.total) * 100);
             });
             xhr.addEventListener('load', () => {
-                if (xhr.status === 200) {
-                    const r = JSON.parse(xhr.responseText);
-                    r.success ? resolve(r.song) : reject(new Error(r.message));
-                } else { reject(new Error(`HTTP ${xhr.status}`)); }
+                const r = JSON.parse(xhr.responseText);
+                if (xhr.status === 409) {
+                    // Duplicate — treat as a soft skip, not a hard error
+                    this.showToast(`Skipped: ${r.message}`, 'warning');
+                    resolve(null);
+                } else if (xhr.status === 200 && r.success) {
+                    resolve(r.song);
+                } else {
+                    reject(new Error(r.message || `HTTP ${xhr.status}`));
+                }
             });
             xhr.addEventListener('error', () => reject(new Error('Network error')));
             xhr.open('POST', '/api/upload');

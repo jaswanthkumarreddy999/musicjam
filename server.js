@@ -585,9 +585,25 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
     let metadata = {};
     try {
       metadata = await musicMetadata.parseFile(req.file.path);
-      console.log('Metadata extracted successfully:', metadata.common);
     } catch (metadataError) {
       console.warn('Failed to extract metadata, using defaults:', metadataError.message);
+    }
+
+    const incomingName = req.file.originalname.toLowerCase().trim();
+    const incomingNoExt = incomingName.replace(/\.[^.]+$/, '');
+
+    // Server-side duplicate check by original filename
+    for (const existing of songs.values()) {
+      const existingName = (existing.originalName || '').toLowerCase().trim();
+      const existingNoExt = existingName.replace(/\.[^.]+$/, '');
+      if (existingName === incomingName || existingNoExt === incomingNoExt) {
+        // Clean up the uploaded file
+        await fs.unlink(req.file.path).catch(() => {});
+        return res.status(409).json({
+          success: false,
+          message: `"${existing.title}" already exists in your library`
+        });
+      }
     }
     
     const song = {
