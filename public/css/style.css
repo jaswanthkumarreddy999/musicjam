@@ -494,52 +494,104 @@ body {
     display: flex; flex-direction: column; gap: 8px;
 }
 
+/* Song card: icon | info (title + meta) | delete button
+   Single-level flex — no nested wrappers — so it never breaks */
 .library-song-card {
     background: var(--card);
     border: 1px solid var(--border);
     border-radius: var(--r-md);
-    padding: 14px 16px;
-    display: flex; align-items: center; gap: 14px;
-    transition: all var(--normal) var(--ease);
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: border-color var(--normal) var(--ease),
+                background var(--normal) var(--ease);
+    /* no transform on mobile — avoids jank */
 }
 
 .library-song-card:hover {
-    border-color: rgba(255,255,255,.1);
-    background: hsla(240,16%,16%,.75);
-    transform: translateX(3px);
+    border-color: rgba(255,255,255,.12);
+    background: hsla(240,16%,16%,.85);
 }
 
+/* Green music note icon */
 .library-song-icon {
     background: var(--grad-green);
     color: hsl(240,30%,8%);
-    width: 42px; height: 42px;
+    width: 40px; height: 40px;
+    min-width: 40px;          /* never shrink */
     border-radius: var(--r-md);
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.1rem; flex-shrink: 0;
-    box-shadow: 0 3px 12px hsla(145,90%,48%,.2);
+    font-size: 1rem;
+    box-shadow: 0 2px 10px hsla(145,90%,48%,.18);
+    flex-shrink: 0;
 }
 
+/* Text block — takes all remaining width */
 .library-song-info {
-    flex: 1; min-width: 0;
+    flex: 1;
+    min-width: 0;             /* allow text to truncate instead of overflow */
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
 }
 
 .library-song-title {
-    font-weight: 700; color: var(--txt);
-    font-size: .95rem; margin-bottom: 2px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-weight: 700;
+    font-size: .9rem;
+    color: var(--txt);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.3;
 }
 
 .library-song-meta {
-    color: var(--txt2); font-size: .78rem;
-    display: flex; gap: 10px; flex-wrap: wrap;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: nowrap;        /* keep on one line, truncate if needed */
+    overflow: hidden;
 }
 
-.library-song-meta span {
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+.meta-artist {
+    font-size: .76rem;
+    color: var(--green);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+    flex-shrink: 1;
 }
 
-.library-song-actions {
+.meta-duration {
+    font-size: .74rem;
+    color: var(--txt3);
+    white-space: nowrap;
+    flex-shrink: 0;           /* duration never truncates */
+    font-variant-numeric: tabular-nums;
+}
+
+/* Delete button — icon only, fixed size, always visible */
+.btn-delete {
     flex-shrink: 0;
+    width: 36px; height: 36px;
+    border-radius: var(--r-sm);
+    border: 1px solid hsla(355,85%,62%,.25);
+    background: transparent;
+    color: var(--red);
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background var(--fast), border-color var(--fast);
+    -webkit-tap-highlight-color: transparent;
+    opacity: .7;
+}
+.btn-delete:hover,
+.library-song-card:hover .btn-delete {
+    opacity: 1;
+    background: hsla(355,85%,62%,.12);
+    border-color: var(--red);
 }
 
 /* ── Empty States ── */
@@ -681,61 +733,100 @@ body {
 }
 
 /* ============================================================
-   Responsive
+   Responsive — Mobile-first
    ============================================================ */
 
-/* Tablet */
-@media (max-width: 768px) {
-    .container { padding: 0 16px; }
+/* ── Small phones (default, no query needed above) ── */
 
-    .hero { padding: 48px 0 36px; }
-    .hero-subtitle { margin-bottom: 28px; }
+/* Tablet ≥ 640px */
+@media (min-width: 640px) {
+    .container { padding: 0 20px; }
 
-    .home-section { padding: 28px 0; }
+    .hero { padding: 56px 0 44px; }
 
-    .section-header { flex-direction: column; align-items: flex-start; gap: 10px; }
-    .section-header-actions { width: 100%; justify-content: flex-start; }
-
-    .rooms-list { grid-template-columns: 1fr; }
-
-    .library-song-card { padding: 12px 14px; }
-
-    .toast-container { top: 12px; right: 12px; left: 12px; }
-    .toast { max-width: none; min-width: 0; }
-
-    .modal-actions { flex-direction: column-reverse; }
-    .modal-actions .btn { width: 100%; }
-
-    .code-box { flex-direction: column; gap: 10px; }
-    .code-box span { text-align: center; }
-    .code-box .btn { width: 100%; }
-}
-
-/* Mobile */
-@media (max-width: 480px) {
-    .header-content { gap: 8px; }
-    .logo-text { font-size: 1.25rem; }
-
-    .hero-subtitle { font-size: 1rem; }
-
-    .join-room-section { max-width: 100%; }
-
-    .library-song-meta { flex-direction: column; gap: 2px; }
-
-    .room-card { padding: 16px; }
-
-    .btn-large { padding: 12px 22px; font-size: .95rem; }
-}
-
-/* Large screens */
-@media (min-width: 1024px) {
-    .hero { padding: 80px 0 60px; }
-    .home-section { padding: 48px 0; }
-
-    /* Side-by-side panels on wide screens */
-    .home-panels {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 24px;
+    .rooms-list {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     }
+
+    .section-header { flex-wrap: nowrap; align-items: center; }
+    .section-header-actions { flex-wrap: nowrap; }
+}
+
+/* Desktop ≥ 1024px */
+@media (min-width: 1024px) {
+    .hero { padding: 80px 0 64px; }
+    .home-section { padding: 52px 0; }
+    .library-song-card:hover { transform: translateX(3px); }
+}
+
+/* ── Max-width breakpoints (fix overflows) ── */
+
+/* All phones ≤ 639px */
+@media (max-width: 639px) {
+    .container { padding: 0 14px; }
+
+    /* Header */
+    .header-content { padding: 11px 0; gap: 8px; }
+    .logo-text { font-size: 1.2rem; }
+    .header-actions .btn { padding: 7px 10px; font-size: .78rem; }
+
+    /* Hero */
+    .hero { padding: 36px 0 28px; }
+    .hero-title { font-size: clamp(1.9rem, 9vw, 2.8rem); }
+    .hero-subtitle { font-size: .95rem; margin-bottom: 24px; }
+    .hero-actions { gap: 12px; }
+    .join-room-section { max-width: 100%; }
+    .btn-large { padding: 12px 20px; font-size: .95rem; }
+
+    /* Sections */
+    .home-section { padding: 24px 0; }
+    .section-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+    .section-header-actions { width: 100%; flex-wrap: wrap; gap: 6px; }
+    .section-heading { font-size: 1.15rem; }
+
+    /* Active rooms */
+    .rooms-list { grid-template-columns: 1fr; gap: 10px; }
+    .room-card { padding: 14px; gap: 10px; }
+    .room-code { font-size: 1.05rem; }
+
+    /* Library cards — tighter on tiny screens */
+    .library-song-card { padding: 10px 12px; gap: 10px; }
+    .library-song-icon { width: 36px; height: 36px; min-width: 36px; font-size: .9rem; }
+    .library-song-title { font-size: .85rem; }
+    .meta-artist { font-size: .72rem; }
+    .meta-duration { font-size: .7rem; }
+    .btn-delete { width: 34px; height: 34px; font-size: .9rem; }
+
+    /* Upload area */
+    .upload-area { padding: 28px 16px; }
+    .upload-icon { font-size: 2.2rem; }
+    .upload-title { font-size: .9rem; }
+    .upload-hint { font-size: .78rem; }
+
+    /* Modals */
+    .modal-overlay { padding: 12px; align-items: flex-end; }
+    .modal { border-radius: var(--r-lg) var(--r-lg) 0 0; max-height: 92dvh; }
+    .modal-header { padding: 16px 18px 14px; }
+    .modal-content { padding: 16px 18px 24px; }
+    .modal-actions { flex-direction: column-reverse; gap: 8px; }
+    .modal-actions .btn { width: 100%; }
+    .code-box { gap: 8px; }
+    .code-box span { font-size: 1.3rem; }
+
+    /* Toasts — full width at top */
+    .toast-container { top: 10px; right: 10px; left: 10px; }
+    .toast { max-width: none; min-width: 0; font-size: .82rem; padding: 10px 14px; }
+}
+
+/* Very small phones ≤ 380px */
+@media (max-width: 380px) {
+    .header-content { padding: 9px 0; }
+    .logo-icon { font-size: 1.4rem; }
+    .logo-text { font-size: 1.1rem; }
+
+    .hero-title { font-size: 1.8rem; }
+
+    .library-song-card { padding: 9px 10px; gap: 8px; }
+    .library-song-icon { width: 32px; height: 32px; min-width: 32px; }
+    .btn-delete { width: 30px; height: 30px; font-size: .85rem; }
 }

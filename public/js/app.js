@@ -628,22 +628,17 @@ class MusicJamApp {
         
         libraryList.innerHTML = this.musicLibrary.map(song => `
             <div class="library-song-card">
-                <div class="library-song-header">
-                    <div class="library-song-icon">🎵</div>
-                    <div class="library-song-info">
-                        <div class="library-song-title">${this.escapeHtml(song.title)}</div>
-                        <div class="library-song-meta">
-                            <span>👤 ${this.escapeHtml(song.artist)}</span>
-                            <span>💿 ${this.escapeHtml(song.album)}</span>
-                            <span>⏱️ ${this.formatDuration(song.duration)}</span>
-                        </div>
+                <div class="library-song-icon">🎵</div>
+                <div class="library-song-info">
+                    <div class="library-song-title">${this.escapeHtml(song.title)}</div>
+                    <div class="library-song-meta">
+                        <span class="meta-artist">${this.escapeHtml(song.artist)}</span>
+                        <span class="meta-duration">${this.formatDuration(song.duration)}</span>
                     </div>
                 </div>
-                <div class="library-song-actions">
-                    <button class="btn btn-outline btn-small delete-song-btn" data-song-id="${song.id}">
-                        🗑️ Delete
-                    </button>
-                </div>
+                <button class="btn-delete delete-song-btn" data-song-id="${song.id}" aria-label="Delete ${this.escapeHtml(song.title)}">
+                    🗑️
+                </button>
             </div>
         `).join('');
         
@@ -661,8 +656,9 @@ class MusicJamApp {
         
         // Add event delegation for delete buttons
         newLibraryList.addEventListener('click', (e) => {
-            if (e.target.classList.contains('delete-song-btn')) {
-                const songId = e.target.getAttribute('data-song-id');
+            const btn = e.target.closest('.delete-song-btn');
+            if (btn) {
+                const songId = btn.getAttribute('data-song-id');
                 this.deleteSong(songId);
             }
         });

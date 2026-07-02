@@ -586,87 +586,98 @@
 #nickname-modal { z-index: 10000; }
 
 /* ============================================================
-   Responsive — Room
+   Responsive — Room (mobile-first)
    ============================================================ */
 
-/* Laptop (≤ 1100px) — tighter column ratio */
+/* Laptop ≤ 1100px */
 @media (max-width: 1100px) {
-    .room-layout {
-        grid-template-columns: 1fr 1fr;
-        gap: 16px;
-    }
+    .room-layout { grid-template-columns: 1fr 1fr; gap: 16px; }
     .artwork-placeholder { width: 180px; height: 180px; font-size: 3.2rem; }
     .song-title { font-size: 1.3rem; }
 }
 
-/* Tablet (≤ 900px) — stack vertically, player on top */
+/* Tablet ≤ 900px — stack vertically */
 @media (max-width: 900px) {
-    .room-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .now-playing {
-        position: static;
-        order: 1;
-    }
-
-    .queue-section {
-        order: 2;
-        max-height: 520px;
-    }
-
-    .now-playing-content { padding: 28px 20px 20px; }
-
+    .room-layout { grid-template-columns: 1fr; }
+    .now-playing { position: static; order: 1; }
+    .queue-section { order: 2; max-height: 520px; }
+    .now-playing-content { padding: 24px 18px 18px; }
     .artwork-placeholder { width: 200px; height: 200px; }
 }
 
-/* Mobile (≤ 640px) */
+/* Mobile ≤ 640px */
 @media (max-width: 640px) {
-    .room-header-content {
-        flex-wrap: wrap;
-        padding: 10px 0 8px;
-    }
-
+    /* Header */
+    .room-header-content { flex-wrap: wrap; padding: 10px 0 8px; gap: 8px; }
     .room-info { width: 100%; }
+    .room-title { font-size: 1rem; }
+    .room-status { font-size: .75rem; }
 
+    /* Room action buttons scroll horizontally */
     .room-actions {
         width: 100%;
         overflow-x: auto;
         -webkit-overflow-scrolling: touch;
         padding-bottom: 2px;
+        gap: 6px;
     }
-    .room-actions .btn { flex-shrink: 0; }
+    .room-actions .btn { flex-shrink: 0; padding: 7px 10px; font-size: .78rem; }
 
-    .room-main { padding: 12px 0 24px; }
+    .room-main { padding: 10px 0 20px; }
 
-    .now-playing-content { padding: 24px 16px 16px; }
+    /* Now playing */
+    .now-playing-content { padding: 20px 14px 14px; min-height: 220px; }
+    .artwork-placeholder { width: 150px; height: 150px; font-size: 2.6rem; }
+    .song-title { font-size: 1.1rem; }
+    .song-artist { font-size: .9rem; }
+    .song-album { font-size: .78rem; }
 
-    .artwork-placeholder { width: 160px; height: 160px; font-size: 2.8rem; }
+    /* Player */
+    .audio-player { padding: 14px 14px 18px; }
+    .progress-section { gap: 8px; margin-bottom: 16px; }
+    .time-display { min-width: 32px; font-size: .7rem; }
 
-    .song-title { font-size: 1.2rem; }
-    .song-artist { font-size: .95rem; }
+    .player-controls { gap: 16px; margin-bottom: 16px; }
+    .control-btn svg { width: 20px; height: 20px; }
+    .control-btn-large { width: 48px; height: 48px; }
+    .control-btn-large svg { width: 22px; height: 22px; }
 
-    .audio-player { padding: 16px 16px 20px; }
-
-    .player-controls { gap: 18px; }
-    .control-btn-large { width: 50px; height: 50px; }
-    .control-btn-large svg { width: 24px; height: 24px; }
-
+    .volume-section { gap: 8px; }
     .volume-slider { width: 80px; }
 
-    .queue-section { max-height: 420px; }
+    /* Queue */
+    .queue-section { max-height: 380px; }
+    .queue-header { padding: 12px 14px; }
+    .queue-list { padding: 6px 8px; }
+    .queue-item { padding: 8px; gap: 8px; }
+    .queue-song-title { font-size: .85rem; }
+    .queue-song-artist { font-size: .73rem; }
+
+    /* Listeners */
+    .queue-listeners { padding: 10px 14px; }
+
+    /* Library modal */
+    .music-library-modal { max-height: 55dvh; }
+    .library-song-item { padding: 9px 8px; gap: 10px; }
+    .library-song-title { font-size: .85rem; }
+
+    /* Nickname modal */
+    .color-swatch { width: 26px; height: 26px; }
 }
 
-/* Very small screens (≤ 380px) */
+/* Very small ≤ 380px */
 @media (max-width: 380px) {
-    .artwork-placeholder { width: 140px; height: 140px; font-size: 2.4rem; }
+    .artwork-placeholder { width: 130px; height: 130px; font-size: 2.2rem; }
+    .song-title { font-size: 1rem; }
 
-    .player-controls { gap: 14px; }
-    .control-btn svg { width: 20px; height: 20px; }
-    .control-btn-large { width: 46px; height: 46px; }
+    .player-controls { gap: 12px; }
+    .control-btn svg { width: 18px; height: 18px; }
+    .control-btn-large { width: 44px; height: 44px; }
+    .control-btn-large svg { width: 20px; height: 20px; }
 
-    .progress-section { gap: 8px; }
-    .time-display { min-width: 30px; font-size: .7rem; }
+    .progress-section { gap: 6px; }
+    .time-display { min-width: 28px; font-size: .65rem; }
 
-    .room-title { font-size: 1rem; }
+    .room-title { font-size: .95rem; }
+    .back-btn { padding: 6px 10px; font-size: .8rem; }
 }
