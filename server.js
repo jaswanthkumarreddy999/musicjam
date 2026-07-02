@@ -383,6 +383,15 @@ class Room {
     return this.currentTime;
   }
 
+  setRepeatMode(mode) {
+    const validModes = ['none', 'one', 'queue'];
+    if (validModes.includes(mode)) {
+      this.repeatMode = mode;
+      return true;
+    }
+    return false;
+  }
+
   getState() {
     return {
       code: this.code,
@@ -728,9 +737,24 @@ app.get('/uploads/:filename', (req, res) => {
   });
 });
 
-// Socket.IO handling
+// Socket.IO handling with error protection
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
+  
+  // Wrap socket event handlers with error protection
+  const safeEventHandler = (eventName, handler) => {
+    socket.on(eventName, async (...args) => {
+      try {
+        await handler(...args);
+      } catch (error) {
+        console.error(`Error in ${eventName} handler:`, error);
+        socket.emit('error', { 
+          message: 'Server error occurred',
+          event: eventName 
+        });
+      }
+    });
+  };
   
   socket.on('join-room', (data) => {
     const { roomCode, userId, nickname, color } = data;
@@ -955,11 +979,21 @@ io.on('connection', (socket) => {
   socket.on('set-repeat-mode', (data) => {
     const { mode } = data;
     const room = rooms.get(socket.currentRoom);
-    if (!room) return;
+    if (!room) {
+      console.log('set-repeat-mode: Room not found');
+      return;
+    }
+    
+    console.log(`Setting repeat mode to: ${mode} for room ${socket.currentRoom}`);
+    
     if (room.setRepeatMode(mode)) {
+      console.log(`Repeat mode updated to: ${room.repeatMode}`);
       io.to(socket.currentRoom).emit('repeat-mode-updated', {
         repeatMode: room.repeatMode
       });
+    } else {
+      console.log(`Invalid repeat mode: ${mode}`);
+      socket.emit('error', { message: 'Invalid repeat mode' });
     }
   });
   
