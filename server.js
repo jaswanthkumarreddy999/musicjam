@@ -400,10 +400,11 @@ class Room {
   }
 }
 
-// Force HTTP redirect for network access
+// Force HTTP redirect for network access (only for local development)
 app.use((req, res, next) => {
-  // If accessed via HTTPS, redirect to HTTP (for local network)
-  if (req.header('x-forwarded-proto') === 'https') {
+  // Only redirect HTTPS to HTTP in local development
+  // Skip this redirect in production environments (like Render)
+  if (process.env.NODE_ENV !== 'production' && req.header('x-forwarded-proto') === 'https') {
     res.redirect(`http://${req.get('host')}${req.url}`);
   } else {
     next();
