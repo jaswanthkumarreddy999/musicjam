@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Storage Dashboard - MusicJam</title>
+    <link rel="stylesheet" href="/css/style.css?v=1.5">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        .dashboard-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: var(--spacing-xl);
+        }
+        
+        .dashboard-header {
+            text-align: center;
+            margin-bottom: var(--spacing-xxl);
+        }
+        
+        .dashboard-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: var(--spacing-sm);
+            background: linear-gradient(135deg, #fff, var(--primary-color));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: var(--spacing-xl);
+            margin-bottom: var(--spacing-xxl);
+        }
+        
+        .stat-card {
+            background: var(--card-color);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            backdrop-filter: blur(12px);
+            transition: all var(--transition-normal);
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow: var(--shadow-md);
+        }
+        
+        .stat-icon {
+            font-size: 2.5rem;
+            margin-bottom: var(--spacing-md);
+            display: block;
+        }
+        
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--primary-color);
+            margin-bottom: var(--spacing-xs);
+        }
+        
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .storage-visual {
+            background: var(--card-color);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            padding: var(--spacing-xl);
+            margin-bottom: var(--spacing-xxl);
+        }
+        
+        .storage-bar-container {
+            margin: var(--spacing-xl) 0;
+        }
+        
+        .storage-bar {
+            width: 100%;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: var(--radius-full);
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .storage-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color), #00d4aa);
+            border-radius: var(--radius-full);
+            transition: width 0.6s ease-out;
+            position: relative;
+        }
+        
+        .storage-fill.warning {
+            background: linear-gradient(90deg, #ffa726, #ff7043);
+        }
+        
+        .storage-fill.danger {
+            background: linear-gradient(90deg, #ef5350, #e53935);
+        }
+        
+        .storage-labels {
+            display: flex;
+            justify-content: space-between;
+            margin-top: var(--spacing-sm);
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+        
+        .songs-table {
+            background: var(--card-color);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+        }
+        
+        .table-header {
+            background: rgba(255, 255, 255, 0.03);
+            padding: var(--spacing-lg);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .songs-list {
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        .song-row {
+            display: grid;
+            grid-template-columns: 1fr 120px 100px 120px 80px;
+            gap: var(--spacing-md);
+            padding: var(--spacing-md) var(--spacing-lg);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            align-items: center;
+            transition: background var(--transition-fast);
+        }
+        
+        .song-row:hover {
+            background: rgba(255, 255, 255, 0.03);
+        }
+        
+        .song-info {
+            min-width: 0;
+        }
+        
+        .song-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .song-artist {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        
+        .song-size {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            text-align: right;
+        }
+        
+        .song-duration {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            text-align: center;
+        }
+        
+        .song-date {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            text-align: center;
+        }
+        
+        .song-actions {
+            text-align: center;
+        }
+        
+        .delete-btn {
+            background: transparent;
+            border: 1px solid rgba(239, 83, 80, 0.3);
+            color: #ef5350;
+            padding: 0.3rem 0.6rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+        
+        .delete-btn:hover {
+            background: rgba(239, 83, 80, 0.1);
+            border-color: #ef5350;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: var(--spacing-xxl);
+            color: var(--text-secondary);
+        }
+        
+        .loading-spinner {
+            width: 30px;
+            height: 30px;
+            border: 3px solid rgba(255, 255, 255, 0.1);
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto var(--spacing-md);
+        }
+        
+        .actions-bar {
+            display: flex;
+            gap: var(--spacing-md);
+            margin-bottom: var(--spacing-xl);
+            flex-wrap: wrap;
+        }
+        
+        .refresh-btn {
+            background: var(--primary-gradient);
+            color: var(--secondary-color);
+        }
+        
+        .clear-all-btn {
+            background: transparent;
+            border: 1px solid rgba(239, 83, 80, 0.3);
+            color: #ef5350;
+        }
+        
+        .clear-all-btn:hover {
+            background: rgba(239, 83, 80, 0.1);
+            border-color: #ef5350;
+        }
+        
+        @media (max-width: 768px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .song-row {
+                grid-template-columns: 1fr 80px 60px;
+                gap: var(--spacing-sm);
+            }
+            
+            .song-duration, .song-date {
+                display: none;
+            }
+            
+            .actions-bar {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Header -->
+        <div class="dashboard-header">
+            <h1 class="dashboard-title">🎵 Storage Dashboard</h1>
+            <p style="color: var(--text-secondary); margin-bottom: var(--spacing-md);">
+                Manage your music library and monitor storage usage
+            </p>
+            <div class="actions-bar">
+                <a href="/" class="btn btn-secondary">← Back to Home</a>
+                <button id="refresh-btn" class="btn btn-primary refresh-btn">🔄 Refresh</button>
+                <button id="clear-all-btn" class="btn clear-all-btn">🗑️ Clear All Songs</button>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="loading">
+            <div class="loading-spinner"></div>
+            <p>Loading storage data...</p>
+        </div>
+
+        <!-- Dashboard Content -->
+        <div id="dashboard-content" class="hidden">
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <span class="stat-icon">🎵</span>
+                    <div class="stat-value" id="total-songs">0</div>
+                    <div class="stat-label">Total Songs</div>
+                </div>
+                
+                <div class="stat-card">
+                    <span class="stat-icon">💾</span>
+                    <div class="stat-value" id="storage-used">0 MB</div>
+                    <div class="stat-label">Storage Used</div>
+                </div>
+                
+                <div class="stat-card">
+                    <span class="stat-icon">🆓</span>
+                    <div class="stat-value" id="storage-free">1000 MB</div>
+                    <div class="stat-label">Available Space</div>
+                </div>
+                
+                <div class="stat-card">
+                    <span class="stat-icon">📊</span>
+                    <div class="stat-value" id="storage-percent">0%</div>
+                    <div class="stat-label">Storage Used</div>
+                </div>
+            </div>
+
+            <!-- Storage Visual -->
+            <div class="storage-visual">
+                <h3 style="margin-bottom: var(--spacing-md); color: var(--text-primary);">
+                    📈 Storage Usage (1GB Total)
+                </h3>
+                <div class="storage-bar-container">
+                    <div class="storage-bar">
+                        <div id="storage-fill" class="storage-fill" style="width: 0%"></div>
+                    </div>
+                    <div class="storage-labels">
+                        <span>0 MB</span>
+                        <span>1000 MB</span>
+                    </div>
+                </div>
+                <p id="storage-status" style="text-align: center; margin-top: var(--spacing-md); color: var(--text-secondary);">
+                    Plenty of space available
+                </p>
+            </div>
+
+            <!-- Songs Table -->
+            <div class="songs-table">
+                <div class="table-header">
+                    <h3 style="color: var(--text-primary); margin: 0;">📚 Music Library</h3>
+                    <span id="songs-count" style="color: var(--text-secondary);">0 songs</span>
+                </div>
+                
+                <div id="songs-list" class="songs-list">
+                    <!-- Songs will be populated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <script>
+        class StorageDashboard {
+            constructor() {
+                this.storageData = null;
+                this.songs = [];
+                this.init();
+            }
+
+            init() {
+                this.bindEvents();
+                this.loadData();
+                // Auto-refresh every 30 seconds
+                setInterval(() => this.loadData(false), 30000);
+            }
+
+            bindEvents() {
+                document.getElementById('refresh-btn').addEventListener('click', () => this.loadData(true));
+                document.getElementById('clear-all-btn').addEventListener('click', () => this.clearAllSongs());
+            }
+
+            async loadData(showLoading = true) {
+                if (showLoading) {
+                    document.getElementById('loading').classList.remove('hidden');
+                    document.getElementById('dashboard-content').classList.add('hidden');
+                }
+
+                try {
+                    const response = await fetch('/api/library');
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.storageData = data.storage;
+                        this.songs = data.songs;
+                        this.renderDashboard();
+                    } else {
+                        throw new Error('Failed to load storage data');
+                    }
+                } catch (error) {
+                    console.error('Error loading data:', error);
+                    this.showToast('Failed to load storage data', 'error');
+                } finally {
+                    if (showLoading) {
+                        document.getElementById('loading').classList.add('hidden');
+                        document.getElementById('dashboard-content').classList.remove('hidden');
+                    }
+                }
+            }
+
+            renderDashboard() {
+                if (!this.storageData) return;
+
+                // Update stats
+                document.getElementById('total-songs').textContent = this.storageData.songCount;
+                document.getElementById('storage-used').textContent = `${this.storageData.totalSizeMB} MB`;
+                document.getElementById('storage-free').textContent = `${this.storageData.availableMB} MB`;
+                document.getElementById('storage-percent').textContent = `${this.storageData.percentUsed}%`;
+
+                // Update storage bar
+                const fillElement = document.getElementById('storage-fill');
+                const percent = this.storageData.percentUsed;
+                
+                fillElement.style.width = `${percent}%`;
+                fillElement.className = 'storage-fill';
+                
+                if (percent > 90) {
+                    fillElement.classList.add('danger');
+                } else if (percent > 70) {
+                    fillElement.classList.add('warning');
+                }
+
+                // Update storage status
+                const statusElement = document.getElementById('storage-status');
+                if (percent > 90) {
+                    statusElement.textContent = `⚠️ Storage almost full! Only ${this.storageData.availableMB} MB remaining`;
+                    statusElement.style.color = '#ef5350';
+                } else if (percent > 70) {
+                    statusElement.textContent = `⚠️ Storage getting full. ${this.storageData.availableMB} MB remaining`;
+                    statusElement.style.color = '#ffa726';
+                } else {
+                    statusElement.textContent = `✅ Plenty of space available - ${this.storageData.availableMB} MB free`;
+                    statusElement.style.color = 'var(--text-secondary)';
+                }
+
+                // Update songs count
+                document.getElementById('songs-count').textContent = `${this.songs.length} song${this.songs.length !== 1 ? 's' : ''}`;
+
+                // Render songs list
+                this.renderSongsList();
+            }
+
+            renderSongsList() {
+                const songsListElement = document.getElementById('songs-list');
+                
+                if (this.songs.length === 0) {
+                    songsListElement.innerHTML = `
+                        <div style="text-align: center; padding: var(--spacing-xxl); color: var(--text-secondary);">
+                            <div style="font-size: 3rem; margin-bottom: var(--spacing-md);">🎵</div>
+                            <p>No songs uploaded yet</p>
+                            <p style="font-size: 0.9rem;">Upload some music to get started!</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                songsListElement.innerHTML = this.songs.map(song => `
+                    <div class="song-row">
+                        <div class="song-info">
+                            <div class="song-title">${this.escapeHtml(song.title)}</div>
+                            <div class="song-artist">${this.escapeHtml(song.artist)}</div>
+                        </div>
+                        <div class="song-size">${this.formatSize(song.size)}</div>
+                        <div class="song-duration">${this.formatDuration(song.duration)}</div>
+                        <div class="song-date">${this.formatDate(song.uploadedAt)}</div>
+                        <div class="song-actions">
+                            <button class="delete-btn" onclick="dashboard.deleteSong('${song.id}')">🗑️</button>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            async deleteSong(songId) {
+                const song = this.songs.find(s => s.id === songId);
+                if (!song) return;
+
+                const confirmed = confirm(`Delete "${song.title}"?\nThis action cannot be undone.`);
+                if (!confirmed) return;
+
+                try {
+                    const response = await fetch(`/api/library/${songId}`, {
+                        method: 'DELETE'
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        this.showToast('Song deleted successfully', 'success');
+                        this.loadData(false); // Refresh without loading screen
+                    } else {
+                        throw new Error(data.message || 'Failed to delete song');
+                    }
+                } catch (error) {
+                    console.error('Error deleting song:', error);
+                    this.showToast('Failed to delete song', 'error');
+                }
+            }
+
+            async clearAllSongs() {
+                if (this.songs.length === 0) {
+                    this.showToast('No songs to delete', 'info');
+                    return;
+                }
+
+                const confirmed = confirm(`Delete ALL ${this.songs.length} songs?\nThis action cannot be undone and will free up ${this.storageData.totalSizeMB} MB of storage.`);
+                if (!confirmed) return;
+
+                try {
+                    const deletePromises = this.songs.map(song => 
+                        fetch(`/api/library/${song.id}`, { method: 'DELETE' })
+                    );
+
+                    await Promise.all(deletePromises);
+
+                    this.showToast('All songs deleted successfully', 'success');
+                    this.loadData(false); // Refresh without loading screen
+                } catch (error) {
+                    console.error('Error clearing library:', error);
+                    this.showToast('Failed to clear library', 'error');
+                }
+            }
+
+            formatSize(bytes) {
+                if (!bytes) return '0 MB';
+                const mb = bytes / (1024 * 1024);
+                return `${mb.toFixed(1)} MB`;
+            }
+
+            formatDuration(seconds) {
+                if (!seconds) return '0:00';
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = Math.floor(seconds % 60);
+                return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+            }
+
+            formatDate(timestamp) {
+                return new Date(timestamp).toLocaleDateString();
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            showToast(message, type = 'info') {
+                const container = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                toast.className = `toast ${type}`;
+                toast.innerHTML = `<span>${this.escapeHtml(message)}</span>`;
+                container.appendChild(toast);
+
+                setTimeout(() => {
+                    if (toast.parentNode) {
+                        toast.parentNode.removeChild(toast);
+                    }
+                }, 4000);
+            }
+        }
+
+        // Initialize dashboard
+        const dashboard = new StorageDashboard();
+    </script>
+</body>
+</html>

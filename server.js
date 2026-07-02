@@ -412,6 +412,10 @@ app.use((req, res, next) => {
 });
 
 // Routes
+app.get('/dashboard', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
+});
+
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -592,9 +596,22 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
 
 app.get('/api/library', (req, res) => {
   const library = Array.from(songs.values()).sort((a, b) => b.uploadedAt - a.uploadedAt);
+  
+  // Calculate total storage used
+  const totalSize = library.reduce((sum, song) => sum + (song.size || 0), 0);
+  const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+  const percentUsed = ((totalSize / (1024 * 1024 * 1024)) * 100).toFixed(1);
+  
   res.json({
     success: true,
-    songs: library
+    songs: library,
+    storage: {
+      songCount: library.length,
+      totalSizeMB: parseFloat(totalSizeMB),
+      percentUsed: parseFloat(percentUsed),
+      availableMB: parseFloat((1000 - parseFloat(totalSizeMB)).toFixed(2)),
+      limitMB: 1000
+    }
   });
 });
 
