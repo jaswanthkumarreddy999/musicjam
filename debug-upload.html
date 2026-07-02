@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Upload Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #121212; color: white; }
+        .upload-area { border: 2px dashed #1db954; padding: 20px; margin: 20px 0; }
+        .result { background: #333; padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .error { background: #ff4444; }
+        .success { background: #44ff44; color: black; }
+    </style>
+</head>
+<body>
+    <h1>MusicJam Upload Debug</h1>
+    
+    <div class="upload-area">
+        <input type="file" id="fileInput" accept="audio/*">
+        <button onclick="uploadFile()">Upload & Debug</button>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script>
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const resultsDiv = document.getElementById('results');
+            
+            if (!fileInput.files[0]) {
+                addResult('Please select a file first', 'error');
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            addResult(`File selected: ${file.name} (${file.size} bytes, ${file.type})`, 'info');
+            
+            const formData = new FormData();
+            formData.append('audio', file);
+            
+            try {
+                addResult('Starting upload...', 'info');
+                
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                addResult(`Response status: ${response.status} ${response.statusText}`, 'info');
+                
+                const responseText = await response.text();
+                addResult(`Response body: ${responseText}`, response.ok ? 'success' : 'error');
+                
+                if (response.ok) {
+                    const data = JSON.parse(responseText);
+                    addResult(`Upload successful! Song ID: ${data.song.id}`, 'success');
+                    
+                    // Test if the file is accessible
+                    const fileUrl = data.song.path;
+                    addResult(`Testing file access: ${fileUrl}`, 'info');
+                    
+                    const fileResponse = await fetch(fileUrl, { method: 'HEAD' });
+                    addResult(`File access: ${fileResponse.status} ${fileResponse.statusText}`, 
+                             fileResponse.ok ? 'success' : 'error');
+                }
+                
+            } catch (error) {
+                addResult(`Upload error: ${error.message}`, 'error');
+                console.error('Full error:', error);
+            }
+        }
+        
+        function addResult(message, type) {
+            const resultsDiv = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            resultsDiv.appendChild(div);
+            console.log(message);
+        }
+    </script>
+</body>
+</html>
