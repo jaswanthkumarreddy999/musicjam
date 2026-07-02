@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MusicJam - Collaborative Music Streaming</title>
+    <link rel="stylesheet" href="/css/style.css?v=1.1">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1db954">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/png" href="/icons/favicon.png">
+    
+    <!-- PWA Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="MusicJam">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-content">
+            <div class="logo">
+                <div class="music-note">🎵</div>
+                <h1>MusicJam</h1>
+            </div>
+            <div class="loading-spinner"></div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app" class="app hidden">
+        <!-- Header -->
+        <header class="header">
+            <div class="container">
+                <div class="header-content">
+                    <div class="logo">
+                        <span class="logo-icon">🎵</span>
+                        <h1 class="logo-text">MusicJam</h1>
+                    </div>
+                    <div class="header-actions">
+                        <button id="install-btn" class="btn btn-outline install-btn hidden">
+                            📱 Install App
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="container">
+                <div class="hero-content">
+                    <h2 class="hero-title">Stream Music Together</h2>
+                    <p class="hero-subtitle">Create rooms, share music, and listen together in real-time</p>
+                    
+                    <div class="hero-actions">
+                        <button id="create-room-btn" class="btn btn-primary btn-large">
+                            <span class="btn-icon">🎵</span>
+                            Create Room
+                        </button>
+                        <div class="join-room-section">
+                            <input type="text" 
+                                   id="room-code-input" 
+                                   placeholder="Enter room code" 
+                                   maxlength="6" 
+                                   class="room-code-input">
+                            <button id="join-room-btn" class="btn btn-secondary">
+                                Join Room
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Music Library Management -->
+        <section class="music-library-section" id="music-library-section">
+            <div class="container">
+                <div class="library-header">
+                    <h3>Your Music Library</h3>
+                    <div class="library-actions">
+                        <button id="refresh-library-btn" class="btn btn-outline btn-small">
+                            🔄 Refresh
+                        </button>
+                        <button id="clear-library-btn" class="btn btn-outline btn-small" style="color: var(--error-color); border-color: var(--error-color);">
+                            🗑️ Clear All
+                        </button>
+                    </div>
+                </div>
+                <div id="library-list" class="library-list">
+                    <!-- Library will be populated here -->
+                </div>
+                <div id="no-library" class="no-library hidden">
+                    <div class="empty-icon">🎵</div>
+                    <p>No music uploaded yet</p>
+                    <p class="small">Upload some music to get started!</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Active Rooms Section -->
+        <section class="active-rooms" id="active-rooms-section">
+            <div class="container">
+                <div class="rooms-header">
+                    <h3>Active Rooms</h3>
+                    <button id="refresh-rooms-btn" class="btn btn-outline btn-small">
+                        🔄 Refresh
+                    </button>
+                </div>
+                <div id="rooms-list" class="rooms-list">
+                    <!-- Rooms will be populated here -->
+                </div>
+                <div id="no-rooms" class="no-rooms hidden">
+                    <div class="empty-icon">🎵</div>
+                    <p>No active rooms found</p>
+                    <p class="small">Create a room to start listening with friends!</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="features">
+            <div class="container">
+                <h3 class="section-title">Features</h3>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🎧</div>
+                        <h4>Real-time Sync</h4>
+                        <p>Everyone listens to the same music at the same time</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🎵</div>
+                        <h4>Collaborative Queue</h4>
+                        <p>Add, remove, and reorder songs together</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📱</div>
+                        <h4>Mobile Friendly</h4>
+                        <p>Works perfectly on phones, tablets, and desktop</p>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🔗</div>
+                        <h4>Easy Sharing</h4>
+                        <p>Share rooms with simple 6-digit codes</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Music Library Section -->
+        <section class="music-library">
+            <div class="container">
+                <div class="library-header">
+                    <h3 class="section-title">Your Music Library</h3>
+                    <button id="upload-btn" class="btn btn-primary">
+                        <span class="btn-icon">📁</span>
+                        Upload Music
+                    </button>
+                </div>
+                
+                <div class="upload-section hidden" id="upload-section">
+                    <div class="upload-area" id="upload-area">
+                        <div class="upload-content">
+                            <div class="upload-icon">📁</div>
+                            <h4>Drop audio files here</h4>
+                            <p>or click to browse</p>
+                            <p class="upload-formats">Supports: MP3, WAV, OGG, M4A, FLAC</p>
+                        </div>
+                        <input type="file" 
+                               id="file-input" 
+                               accept="audio/*" 
+                               multiple 
+                               style="display: none;">
+                    </div>
+                    <div class="upload-progress hidden" id="upload-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progress-fill"></div>
+                        </div>
+                        <p class="progress-text" id="progress-text">Uploading...</p>
+                    </div>
+                </div>
+                
+                <div class="library-content" id="library-content">
+                    <div class="library-empty" id="library-empty">
+                        <div class="empty-icon">🎵</div>
+                        <h4>No music yet</h4>
+                        <p>Upload some audio files to get started</p>
+                    </div>
+                    <div class="library-grid hidden" id="library-grid">
+                        <!-- Songs will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="container">
+                <p>&copy; 2024 MusicJam. Stream music together, anywhere.</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- Modals -->
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal" id="room-created-modal">
+            <div class="modal-header">
+                <h3>Room Created! 🎉</h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-content">
+                <div class="room-code-display">
+                    <label>Share this code with friends:</label>
+                    <div class="code-box">
+                        <span id="created-room-code">123456</span>
+                        <button id="copy-code-btn" class="btn btn-small">Copy</button>
+                    </div>
+                </div>
+                <div class="modal-actions">
+                    <button id="enter-room-btn" class="btn btn-primary">Enter Room</button>
+                    <button class="btn btn-secondary" onclick="closeModal()">Later</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/app.js"></script>
+</body>
+</html>

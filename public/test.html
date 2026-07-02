@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MusicJam - Button Test</title>
+    <style>
+        body { background: #121212; color: white; font-family: Arial, sans-serif; padding: 20px; }
+        .test-btn { padding: 10px 20px; margin: 10px; background: #1db954; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .test-btn:hover { background: #1ed760; }
+    </style>
+</head>
+<body>
+    <h1>🎵 MusicJam Button Test</h1>
+    <p>Testing if JavaScript is working properly:</p>
+    
+    <button class="test-btn" onclick="testAlert()">Test Alert</button>
+    <button class="test-btn" onclick="testConsole()">Test Console</button>
+    <button class="test-btn" onclick="testFetch()">Test API</button>
+    <button class="test-btn" onclick="testNavigation()">Go to Main App</button>
+    
+    <div id="test-output" style="margin-top: 20px; padding: 10px; background: #282828; border-radius: 5px;"></div>
+    
+    <script>
+        console.log('Test page loaded successfully');
+        
+        function testAlert() {
+            alert('JavaScript is working!');
+            log('Alert test passed ✅');
+        }
+        
+        function testConsole() {
+            console.log('Console test message');
+            log('Console test passed ✅ (check browser console)');
+        }
+        
+        async function testFetch() {
+            try {
+                log('Testing API connection...');
+                const response = await fetch('/api/library');
+                const data = await response.json();
+                log(`API test passed ✅ - Status: ${response.status}`);
+                log(`Library has ${data.songs ? data.songs.length : 0} songs`);
+            } catch (error) {
+                log(`API test failed ❌ - Error: ${error.message}`);
+            }
+        }
+        
+        function testNavigation() {
+            window.location.href = '/';
+        }
+        
+        function log(message) {
+            const output = document.getElementById('test-output');
+            output.innerHTML += '<div>' + message + '</div>';
+        }
+        
+        // Auto-run tests
+        document.addEventListener('DOMContentLoaded', () => {
+            log('DOM loaded ✅');
+            log('JavaScript execution ✅');
+        });
+    </script>
+</body>
+</html>
