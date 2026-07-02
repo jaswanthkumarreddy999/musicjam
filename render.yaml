@@ -1,0 +1,21 @@
+# Render.com deployment configuration
+services:
+  - type: web
+    name: musicjam
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        fromService:
+          type: web
+          name: musicjam
+          property: port
+    autoDeploy: true
+    disk:
+      name: musicjam-uploads
+      mountPath: /opt/render/project/src/uploads
+      sizeGB: 1
