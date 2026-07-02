@@ -28,44 +28,25 @@ class MusicJamApp {
         this.joinRoomBtn = document.getElementById('join-room-btn');
         this.uploadBtn = document.getElementById('upload-btn');
         this.installBtn = document.getElementById('install-btn');
-        
+
         // Inputs
         this.roomCodeInput = document.getElementById('room-code-input');
         this.fileInput = document.getElementById('file-input');
-        
-        // Sections
+
+        // Upload UI
         this.uploadSection = document.getElementById('upload-section');
         this.uploadArea = document.getElementById('upload-area');
         this.uploadProgress = document.getElementById('upload-progress');
-        this.libraryContent = document.getElementById('library-content');
-        this.libraryEmpty = document.getElementById('library-empty');
-        this.libraryGrid = document.getElementById('library-grid');
-        
+
         // Progress elements
         this.progressFill = document.getElementById('progress-fill');
         this.progressText = document.getElementById('progress-text');
-        
+
         // Modal elements
         this.modalOverlay = document.getElementById('modal-overlay');
-        this.roomCreatedModal = document.getElementById('room-created-modal');
         this.createdRoomCode = document.getElementById('created-room-code');
         this.copyCodeBtn = document.getElementById('copy-code-btn');
         this.enterRoomBtn = document.getElementById('enter-room-btn');
-        
-        // Debug: Log missing elements
-        const elements = {
-            createRoomBtn: this.createRoomBtn,
-            joinRoomBtn: this.joinRoomBtn,
-            uploadBtn: this.uploadBtn,
-            roomCodeInput: this.roomCodeInput,
-            fileInput: this.fileInput
-        };
-        
-        Object.entries(elements).forEach(([name, element]) => {
-            if (!element) {
-                console.error(`Element not found: ${name}`);
-            }
-        });
     }
     
     bindEvents() {
@@ -88,11 +69,9 @@ class MusicJamApp {
             });
         }
         
-        // Upload actions (with null checks)
+        // Upload actions
         if (this.uploadBtn) {
             this.uploadBtn.addEventListener('click', () => this.toggleUploadSection());
-        } else {
-            console.error('Upload button not found');
         }
         
         if (this.uploadArea) {
@@ -220,7 +199,7 @@ class MusicJamApp {
             this.showToast('Error checking room. Please try again.', 'error');
         } finally {
             this.joinRoomBtn.disabled = false;
-            this.joinRoomBtn.innerHTML = 'Join Room';
+            this.joinRoomBtn.innerHTML = 'Join';
         }
     }
     
@@ -268,10 +247,10 @@ class MusicJamApp {
         const isHidden = this.uploadSection.classList.contains('hidden');
         if (isHidden) {
             this.uploadSection.classList.remove('hidden');
-            this.uploadBtn.innerHTML = '<span class="btn-icon">❌</span>Cancel Upload';
+            this.uploadBtn.innerHTML = '<span>✕</span> Cancel';
         } else {
             this.uploadSection.classList.add('hidden');
-            this.uploadBtn.innerHTML = '<span class="btn-icon">📁</span>Upload Music';
+            this.uploadBtn.innerHTML = '<span>➕</span> Upload';
         }
     }
     
@@ -354,14 +333,14 @@ class MusicJamApp {
         // Reset upload UI
         setTimeout(() => {
             this.uploadProgress.classList.add('hidden');
-            this.uploadArea.style.display = 'block';
+            this.uploadArea.style.display = '';
             this.progressFill.style.width = '0%';
             this.fileInput.value = '';
-            
+
             // Reset upload button
             this.uploadSection.classList.add('hidden');
-            this.uploadBtn.innerHTML = '<span class="btn-icon">📁</span>Upload Music';
-            
+            this.uploadBtn.innerHTML = '<span>➕</span> Upload';
+
             // Reload library
             this.loadMusicLibrary();
         }, 1000);
@@ -419,24 +398,7 @@ class MusicJamApp {
     }
     
     renderMusicLibrary() {
-        if (this.musicLibrary.length === 0) {
-            this.libraryEmpty.classList.remove('hidden');
-            this.libraryGrid.classList.add('hidden');
-            return;
-        }
-        
-        this.libraryEmpty.classList.add('hidden');
-        this.libraryGrid.classList.remove('hidden');
-        
-        this.libraryGrid.innerHTML = this.musicLibrary.map(song => `
-            <div class="song-card" data-song-id="${song.id}">
-                <div class="song-info">
-                    <h4>${this.escapeHtml(song.title)}</h4>
-                    <p>${this.escapeHtml(song.artist)}</p>
-                    <p class="song-duration">${this.formatDuration(song.duration)}</p>
-                </div>
-            </div>
-        `).join('');
+        // No-op: home page rendering handled by renderHomeLibrary()
     }
     
     formatDuration(seconds) {
@@ -477,34 +439,20 @@ class MusicJamApp {
         // Register service worker
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js')
-                .then(registration => {
-                    console.log('SW registered: ', registration);
-                })
-                .catch(registrationError => {
-                    console.log('SW registration failed: ', registrationError);
-                });
+                .then(registration => console.log('SW registered:', registration))
+                .catch(err => console.log('SW registration failed:', err));
         }
-        
-        // Handle PWA install prompt
-        let deferredPrompt;
-        
+
+        // Capture install prompt — must be assigned inside the handler
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
-            deferredPrompt = e;
-            
-            if (this.installBtn) {
-                this.installBtn.classList.remove('hidden');
-            }
+            this.deferredPrompt = e;  // fixed: assign to this.deferredPrompt inside the event
+            if (this.installBtn) this.installBtn.classList.remove('hidden');
         });
-        
-        this.deferredPrompt = deferredPrompt;
-        
-        // Handle PWA install
+
         window.addEventListener('appinstalled', () => {
-            console.log('PWA was installed');
-            if (this.installBtn) {
-                this.installBtn.classList.add('hidden');
-            }
+            this.deferredPrompt = null;
+            if (this.installBtn) this.installBtn.classList.add('hidden');
         });
     }
     
