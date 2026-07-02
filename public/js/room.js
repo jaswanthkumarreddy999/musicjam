@@ -382,31 +382,37 @@ class RoomSocketManager {
         if (!this.queueCount) return;
         this.queueCount.textContent = queue.length;
 
+        // Keep roomData in sync so library panel knows what's queued
+        if (this.roomData) this.roomData.queue = queue;
+
         if (queue.length === 0) {
             this.queueEmpty.classList.remove('hidden');
             this.queueList.classList.add('hidden');
-            return;
+        } else {
+            this.queueEmpty.classList.add('hidden');
+            this.queueList.classList.remove('hidden');
+
+            this.queueList.innerHTML = queue.map((song, index) => `
+                <div class="queue-item" data-song-id="${song.id}" data-index="${index}" draggable="true">
+                    <span class="queue-number">${index + 1}</span>
+                    <div class="drag-handle" title="Drag to reorder">⠿</div>
+                    <div class="queue-song-info">
+                        <div class="queue-song-title">${this.escapeHtml(song.title)}</div>
+                        <div class="queue-song-artist">${this.escapeHtml(song.artist)}</div>
+                    </div>
+                    <div class="queue-vote-count" title="Upvotes">▲ ${song.votes || 0}</div>
+                    <div class="queue-actions">
+                        <button class="queue-action-btn upvote" data-queue-id="${song.id}" title="Upvote">▲</button>
+                        <button class="queue-action-btn remove" data-song-id="${song.id}" title="Remove">✕</button>
+                    </div>
+                </div>
+            `).join('');
+
+            this.bindDragToReorder();
         }
-        this.queueEmpty.classList.add('hidden');
-        this.queueList.classList.remove('hidden');
 
-        this.queueList.innerHTML = queue.map((song, index) => `
-            <div class="queue-item" data-song-id="${song.id}" data-index="${index}" draggable="true">
-                <span class="queue-number">${index + 1}</span>
-                <div class="drag-handle" title="Drag to reorder">⠿</div>
-                <div class="queue-song-info">
-                    <div class="queue-song-title">${this.escapeHtml(song.title)}</div>
-                    <div class="queue-song-artist">${this.escapeHtml(song.artist)}</div>
-                </div>
-                <div class="queue-vote-count" title="Upvotes">▲ ${song.votes || 0}</div>
-                <div class="queue-actions">
-                    <button class="queue-action-btn upvote" data-queue-id="${song.id}" title="Upvote">▲</button>
-                    <button class="queue-action-btn remove" data-song-id="${song.id}" title="Remove">✕</button>
-                </div>
-            </div>
-        `).join('');
-
-        this.bindDragToReorder();
+        // Re-render library to hide/show songs based on queue state
+        this.renderLibraryPanel();
     }
 
     bindDragToReorder() {
@@ -442,6 +448,8 @@ class RoomSocketManager {
 
     handlePlaybackState(data) {
         if (data.currentSong) {
+            // Keep roomData current song in sync for library filtering
+            if (this.roomData) this.roomData.currentSong = data.currentSong;
             this.audioPlayer.loadSong(data.currentSong);
             this.injectSkipVoteBtn();
         }
@@ -487,13 +495,28 @@ class RoomSocketManager {
         const list = document.getElementById('library-panel-list');
         if (!list) return;
 
-        const songs = filtered !== null ? filtered : this.musicLibrary;
+        // Build set of song IDs already in queue or currently playing
+        const queuedIds = new Set();
+        if (this.roomData) {
+            if (this.roomData.currentSong) {
+                queuedIds.add(this.roomData.currentSong.originalSongId || this.roomData.currentSong.id);
+            }
+            (this.roomData.queue || []).forEach(q => {
+                queuedIds.add(q.originalSongId || q.id);
+            });
+        }
+
+        let songs = filtered !== null ? filtered : this.musicLibrary;
+        // Hide songs already queued (unless a search term is active — user may want to see them)
+        if (filtered === null) {
+            songs = songs.filter(s => !queuedIds.has(s.id));
+        }
 
         if (songs.length === 0) {
             list.innerHTML = `
                 <div class="lp-empty">
                     <div class="empty-icon">🎵</div>
-                    <p>${filtered !== null ? 'No songs match' : 'No songs yet — upload some!'}</p>
+                    <p>${filtered !== null ? 'No songs match' : (this.musicLibrary.length === 0 ? 'No songs yet — upload some!' : 'All songs are in the queue!')}</p>
                 </div>`;
             return;
         }
