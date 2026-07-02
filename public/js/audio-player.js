@@ -22,6 +22,7 @@ class AudioPlayer {
         this.volumeBtn = document.getElementById('volume-btn');
         this.repeatBtn = document.getElementById('repeat-btn');
         this.repeatBadge = document.getElementById('repeat-badge');
+        this.testAutoAdvanceBtn = document.getElementById('test-auto-advance');
         
         // Progress
         this.progressBar = document.getElementById('progress-bar');
@@ -51,6 +52,15 @@ class AudioPlayer {
             this.repeatBtn.addEventListener('click', () => this.handleRepeatToggle());
         }
         
+        // Test auto-advance button (for debugging)
+        if (this.testAutoAdvanceBtn) {
+            this.testAutoAdvanceBtn.addEventListener('click', () => {
+                console.log('Testing auto-advance - simulating song end');
+                this.socketManager.showToast('Testing auto-advance...', 'info');
+                this.audio.dispatchEvent(new Event('ended'));
+            });
+        }
+        
         // Progress bar
         this.progressBar.addEventListener('click', (e) => this.handleSeek(e));
         this.progressBar.addEventListener('mousedown', (e) => this.startDrag(e));
@@ -72,13 +82,22 @@ class AudioPlayer {
             if (!this.isSyncing) {
                 this.updateCurrentTime();
                 this.updateProgress();
+                
+                // Debug: Log when close to end for testing
+                const remaining = this.audio.duration - this.audio.currentTime;
+                if (remaining < 5 && remaining > 4.5) {
+                    console.log(`Song ending soon: ${remaining.toFixed(1)}s remaining`);
+                }
             }
         });
         
         this.audio.addEventListener('ended', () => {
-            if (this.isHost) {
-                this.socketManager.nextSong();
-            }
+            console.log('Song ended, triggering auto-advance');
+            // Show user feedback that auto-advance is happening
+            this.socketManager.showToast('Song ended - Playing next...', 'info');
+            // Auto-advance to next song when current song ends
+            // In collaborative mode, any user can trigger this
+            this.socketManager.nextSong();
         });
         
         this.audio.addEventListener('loadstart', () => {

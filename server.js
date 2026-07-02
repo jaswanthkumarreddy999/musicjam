@@ -908,6 +908,14 @@ io.on('connection', (socket) => {
       return;
     }
     
+    // Add debouncing to prevent multiple rapid next-song calls
+    const now = Date.now();
+    if (room.lastNextSongTime && (now - room.lastNextSongTime) < 1000) {
+      console.log('Next song request ignored - too rapid');
+      return;
+    }
+    room.lastNextSongTime = now;
+    
     const nextSong = room.nextSong();
     
     if (nextSong) {
