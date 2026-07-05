@@ -13,14 +13,12 @@ const cloudinary = require('cloudinary').v2;
 const { Readable } = require('stream');
 
 // ── Cloudinary config ──────────────────────────────────────────
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'lu9erudm',
-  api_key:    process.env.CLOUDINARY_API_KEY    || '643732913946747',
-  api_secret: process.env.CLOUDINARY_API_SECRET || 'WHCHLt3jmNN7iVJ8rmuM_7QZAdg',
-  secure: true
-});
+const CLOUD_NAME   = process.env.CLOUDINARY_CLOUD_NAME || 'lu9erudm';
+const CLOUD_KEY    = process.env.CLOUDINARY_API_KEY    || '643732913946747';
+const CLOUD_SECRET = process.env.CLOUDINARY_API_SECRET || 'WHCHLt3jmNN7iVJ8rmuM_7QZAdg';
 
-console.log('☁️  Cloudinary cloud:', process.env.CLOUDINARY_CLOUD_NAME || 'lu9erudm (fallback)');
+cloudinary.config({ cloud_name: CLOUD_NAME, api_key: CLOUD_KEY, api_secret: CLOUD_SECRET, secure: true });
+console.log('☁️  Cloudinary cloud:', CLOUD_NAME);
 
 const app = express();
 const server = http.createServer(app);
@@ -93,36 +91,37 @@ const rooms = new Map();
 const songs = new Map();
 const users = new Map(); // socketId -> { userId, roomCode, nickname, color }
 
-// ── Persistent song metadata ─────────────────────────────────
-// Uses /tmp on ephemeral hosts — songs stay on Cloudinary permanently regardless
-const SONGS_DB_FILE = process.env.SONGS_DB_PATH ||
-  path.join(require('os').tmpdir(), 'musicjam-songs-db.json');
+// ── Persistent song metadata — backed by Cloudinary raw asset ──
+const SONGS_DB_PUBLIC_ID = 'musicjam/songs-db';
 
-console.log('Songs DB path:', SONGS_DB_FILE);
-
-// Load songs from persistent storage
 async function loadSongsFromDB() {
   try {
-    const data = await fs.readFile(SONGS_DB_FILE, 'utf8');
-    const songsData = JSON.parse(data);
-    // All files are on Cloudinary — no local existence check needed
-    for (const song of songsData) {
-      songs.set(song.id, song);
+    const url = cloudinary.url(SONGS_DB_PUBLIC_ID, { resource_type: 'raw', secure: true });
+    const res = await fetch(url + '?t=' + Date.now());
+    if (res.ok) {
+      const songsData = await res.json();
+      for (const song of songsData) songs.set(song.id, song);
+      console.log(`Loaded ${songs.size} songs from Cloudinary DB`);
+      return;
     }
-    console.log(`Loaded ${songs.size} songs from database`);
-  } catch (error) {
-    console.log('No existing songs database, starting fresh');
+    console.log('Cloudinary DB not found, starting fresh');
+  } catch (e) {
+    console.log('Could not load Cloudinary DB:', e.message);
   }
 }
 
-// Save songs to persistent storage
 async function saveSongsToDB() {
   try {
-    const songsArray = Array.from(songs.values());
-    await fs.writeFile(SONGS_DB_FILE, JSON.stringify(songsArray, null, 2));
-    console.log(`Saved ${songsArray.length} songs to database`);
+    const json = JSON.stringify(Array.from(songs.values()), null, 2);
+    await uploadToCloudinary(Buffer.from(json), {
+      resource_type: 'raw',
+      public_id: SONGS_DB_PUBLIC_ID,
+      overwrite: true,
+      invalidate: true,
+    });
+    console.log(`Saved ${songs.size} songs to Cloudinary DB`);
   } catch (error) {
-    console.error('Failed to save songs to database:', error);
+    console.error('Failed to save songs DB:', error.message);
   }
 }
 
@@ -326,7 +325,8 @@ class Room {
       repeatMode: this.repeatMode,
       hasPrev: this.history.length > 0,
       autoRequeue: this.autoRequeue,
-      noDuplicates: this.noDuplicates
+      noDuplicates: this.noDuplicates,
+      history: this.history.slice(-10).reverse()
     };
   }
 }
@@ -479,12 +479,9 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
       }
     }
 
-    // Upload buffer to Cloudinary
-    // Cloudinary resource_type: 'video' handles both audio and video files
-    // 'raw' would work too but 'video' gives duration metadata
-    const cloudinaryResourceType = isVideo ? 'video' : 'video';
+    // Upload buffer to Cloudinary — resource_type 'video' handles both audio and video
     const cloudResult = await uploadToCloudinary(req.file.buffer, {
-      resource_type: cloudinaryResourceType,
+      resource_type: 'video',
       folder: 'musicjam',
       public_id: `${Date.now()}-${uuidv4().slice(0, 8)}`,
       use_filename: false,
@@ -641,21 +638,6 @@ app.delete('/api/rooms/:code', (req, res) => {
 // Socket.IO handling with error protection
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.id}`);
-  
-  // Wrap socket event handlers with error protection
-  const safeEventHandler = (eventName, handler) => {
-    socket.on(eventName, async (...args) => {
-      try {
-        await handler(...args);
-      } catch (error) {
-        console.error(`Error in ${eventName} handler:`, error);
-        socket.emit('error', { 
-          message: 'Server error occurred',
-          event: eventName 
-        });
-      }
-    });
-  };
   
   socket.on('join-room', (data) => {
     const { roomCode, userId, nickname, color } = data;
@@ -818,33 +800,28 @@ io.on('connection', (socket) => {
   
   socket.on('next-song', () => {
     const room = rooms.get(socket.currentRoom);
-    
-    if (!room) {
-      socket.emit('error', { message: 'Not in a room' });
-      return;
-    }
-    
-    // Add debouncing to prevent multiple rapid next-song calls
+    if (!room) { socket.emit('error', { message: 'Not in a room' }); return; }
+
+    // Strong debounce — per-song lock prevents multi-client double-fire on song end
     const now = Date.now();
-    if (room.lastNextSongTime && (now - room.lastNextSongTime) < 1000) {
-      console.log('Next song request ignored - too rapid');
+    const songKey = room.currentSong?.id || 'none';
+    if (room.lastNextSongKey === songKey && room.lastNextSongTime && (now - room.lastNextSongTime) < 2000) {
       return;
     }
+    room.lastNextSongKey = songKey;
     room.lastNextSongTime = now;
-    
+
     const nextSong = room.nextSong();
-    
-    if (nextSong) {
-      room.play();
-    }
-    
+    if (nextSong) room.play();
+
     io.to(socket.currentRoom).emit('playback-state', {
       isPlaying: !!nextSong,
       currentSong: room.currentSong,
       currentTime: 0,
       queue: room.queue,
       repeatMode: room.repeatMode,
-      hasPrev: room.history.length > 0
+      hasPrev: room.history.length > 0,
+      history: room.history.slice(-10).reverse()
     });
   });
 
@@ -864,7 +841,8 @@ io.on('connection', (socket) => {
       currentTime: 0,
       queue: room.queue,
       repeatMode: room.repeatMode,
-      hasPrev: room.history.length > 0
+      hasPrev: room.history.length > 0,
+      history: room.history.slice(-10).reverse()
     });
   });
 

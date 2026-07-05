@@ -18,12 +18,14 @@
     <!-- Loading Screen -->
     <div id="loading-screen" class="loading-screen">
         <div class="loading-content">
-            <div class="logo">
-                <div class="music-note">🎵</div>
-                <h1>MusicJam</h1>
+            <div class="loading-logo">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:var(--green)">
+                    <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+                </svg>
+                <span style="font-size:1.3rem;font-weight:800;letter-spacing:-.02em;background:var(--grad-green);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">MusicJam</span>
             </div>
             <div class="loading-spinner"></div>
-            <p style="color:var(--txt2);font-size:.9rem;margin-top:4px;">Connecting to room…</p>
+            <p style="color:var(--txt2);font-size:.85rem;margin-top:4px;">Connecting to room…</p>
         </div>
     </div>
 
@@ -46,7 +48,14 @@
                         </div>
                     </div>
                     <div class="room-actions">
-                        <button id="share-room-btn" class="btn btn-outline btn-small">🔗 Share</button>
+                        <button id="share-room-btn" class="btn btn-outline btn-small">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                            </svg>
+                            Share
+                        </button>
                     </div>
                 </div>
             </div>
@@ -61,13 +70,21 @@
                     <section class="now-playing">
                         <div class="now-playing-content" id="now-playing-content">
                             <div class="no-song" id="no-song-display">
-                                <div class="no-song-icon">🎵</div>
-                                <h3>No song playing</h3>
-                                <p>Add a song from your library →</p>
+                                <div class="no-song-icon">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
+                                        <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+                                    </svg>
+                                </div>
+                                <h3>Nothing playing</h3>
+                                <p>Add a song from your library</p>
                             </div>
                             <div class="song-display hidden" id="song-display">
                                 <div class="song-artwork">
-                                    <div class="artwork-placeholder" id="song-artwork">🎵</div>
+                                    <div class="artwork-placeholder" id="song-artwork">
+                                        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" style="opacity:.5">
+                                            <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+                                        </svg>
+                                    </div>
                                     <!-- Video element renders here when playing video -->
                                     <div class="song-info">
                                         <span id="media-type-badge" class="media-badge media-badge-audio">♪ Audio</span>
@@ -129,26 +146,39 @@
                             <h3>Queue <span class="queue-count" id="queue-count">0</span></h3>
                             <div class="queue-toggles">
                                 <button id="auto-requeue-btn" class="toggle-btn" title="Auto-requeue: finished songs re-add to end of queue">
-                                    🔁 Auto
+                                    ↻ Auto
                                 </button>
                                 <button id="no-duplicates-btn" class="toggle-btn" title="No duplicates: block same song being added twice">
-                                    🚫 Dupes
+                                    ≠ Dupes
                                 </button>
                             </div>
                         </div>
 
                         <div class="queue-content">
                             <div class="queue-empty" id="queue-empty">
-                                <div class="queue-empty-icon">📜</div>
+                                <div class="queue-empty-icon">
+                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                                </div>
                                 <p>Queue is empty</p>
-                                <p class="queue-empty-subtitle">Tap ➕ on any song</p>
+                                <p class="queue-empty-subtitle">Tap + on any song to add it</p>
                             </div>
                             <div class="queue-list hidden" id="queue-list"></div>
                         </div>
 
                         <div class="queue-listeners">
-                            <div class="ql-label">🎧 In this room</div>
+                            <div class="ql-label">In this room</div>
                             <div class="ql-list" id="ql-list"></div>
+                        </div>
+
+                        <!-- History panel -->
+                        <div class="queue-history">
+                            <div class="history-toggle" id="history-toggle">
+                                <span>Recently played</span>
+                                <svg class="history-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M6 9l6 6 6-6"/></svg>
+                            </div>
+                            <div class="history-list hidden" id="history-list">
+                                <p class="history-empty">No songs played yet</p>
+                            </div>
                         </div>
                     </section>
 
@@ -219,6 +249,10 @@
                             <button id="copy-share-url-btn" class="btn btn-small btn-outline">Copy</button>
                         </div>
                     </div>
+                    <div class="share-qr-wrap">
+                        <div id="share-qr" class="share-qr"></div>
+                        <p class="share-qr-label">Scan to join</p>
+                    </div>
                     <button id="share-native-btn" class="btn btn-primary" style="display:none;width:100%;margin-top:4px;">📱 Share</button>
                 </div>
             </div>
@@ -249,6 +283,7 @@
     <div id="toast-container" class="toast-container"></div>
 
     <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <script src="/js/audio-player.js"></script>
     <script src="/js/room.js"></script>
 </body>

@@ -12,6 +12,7 @@ class RoomSocketManager {
         this.musicLibrary = [];
         this.dragSrcIndex = null;
         this.autoRequeue = false;
+        this.noDuplicates = false;
 
         this.COLORS = [
             '#00f59b', '#00b4d8', '#e040fb', '#ff6b6b',
@@ -188,6 +189,20 @@ class RoomSocketManager {
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden && this.isConnected) this.socket.emit('sync-request');
         });
+
+        // History toggle
+        const historyToggle = document.getElementById('history-toggle');
+        if (historyToggle) {
+            historyToggle.addEventListener('click', () => {
+                const list = document.getElementById('history-list');
+                const chevron = historyToggle.querySelector('.history-chevron');
+                if (list) {
+                    const open = !list.classList.contains('hidden');
+                    list.classList.toggle('hidden', open);
+                    if (chevron) chevron.style.transform = open ? '' : 'rotate(180deg)';
+                }
+            });
+        }
     }
 
     generateUserId() {
@@ -333,6 +348,7 @@ class RoomSocketManager {
         if (roomData.userList) this.renderListeners(roomData.userList);
         if (roomData.repeatMode !== undefined) this.audioPlayer.updateRepeatUI(roomData.repeatMode);
         if (roomData.hasPrev !== undefined) this.audioPlayer.updatePrevButton(roomData.hasPrev);
+        if (roomData.history) this.renderHistory(roomData.history);
     }
 
     /* ── Queue ── */
@@ -414,6 +430,25 @@ class RoomSocketManager {
             this.audioPlayer.updateRepeatUI(data.repeatMode);
         }
         if (data.hasPrev !== undefined) this.audioPlayer.updatePrevButton(data.hasPrev);
+        if (data.history) this.renderHistory(data.history);
+    }
+
+    /* ── History panel ── */
+    renderHistory(history) {
+        const el = document.getElementById('history-list');
+        if (!el) return;
+        if (!history || history.length === 0) {
+            el.innerHTML = '<p class="history-empty">No songs played yet</p>';
+            return;
+        }
+        el.innerHTML = history.map(song => `
+            <div class="history-item">
+                <div class="history-song-info">
+                    <div class="history-song-title">${this.escapeHtml(song.title)}</div>
+                    <div class="history-song-artist">${this.escapeHtml(song.artist)}</div>
+                </div>
+            </div>
+        `).join('');
     }
 
     play()    { this.socket.emit('play'); }
@@ -569,6 +604,20 @@ class RoomSocketManager {
         if (this.shareRoomCode) this.shareRoomCode.textContent = this.roomCode;
         if (this.shareRoomUrl) this.shareRoomUrl.textContent = window.location.href;
         if (this.shareModal) this.shareModal.classList.remove('hidden');
+
+        // Generate QR code
+        const qrEl = document.getElementById('share-qr');
+        if (qrEl && window.QRCode) {
+            qrEl.innerHTML = '';
+            new window.QRCode(qrEl, {
+                text: window.location.href,
+                width: 140,
+                height: 140,
+                colorDark: '#ffffff',
+                colorLight: '#0d0c18',
+                correctLevel: window.QRCode.CorrectLevel.M
+            });
+        }
     }
     closeShareModal() { if (this.shareModal) this.shareModal.classList.add('hidden'); }
 
