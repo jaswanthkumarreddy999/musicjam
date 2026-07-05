@@ -45,7 +45,8 @@ app.use(helmet({
       mediaSrc:      ["'self'", "blob:", "data:", "https://res.cloudinary.com"],
       imgSrc:        ["'self'", "data:", "https://res.cloudinary.com"],
       connectSrc:    ["'self'", "ws:", "wss:", "https://fonts.googleapis.com",
-                      "https://fonts.gstatic.com", "https://api.cloudinary.com"]
+                      "https://fonts.gstatic.com", "https://api.cloudinary.com",
+                      "https://res.cloudinary.com"]
     }
   }
 }));

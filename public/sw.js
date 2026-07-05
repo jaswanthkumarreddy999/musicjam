@@ -1,7 +1,7 @@
 // Service Worker for MusicJam PWA
-const CACHE_NAME = 'musicjam-v1.0.0';
-const STATIC_CACHE = 'musicjam-static-v1';
-const DYNAMIC_CACHE = 'musicjam-dynamic-v1';
+const CACHE_NAME = 'musicjam-v2.0.0';
+const STATIC_CACHE = 'musicjam-static-v2';
+const DYNAMIC_CACHE = 'musicjam-dynamic-v2';
 
 // Files to cache for offline functionality
 const STATIC_ASSETS = [
@@ -82,17 +82,20 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
     const { request } = event;
     const url = new URL(request.url);
-    
+
     // Skip non-GET requests
-    if (request.method !== 'GET') {
-        return;
-    }
-    
+    if (request.method !== 'GET') return;
+
     // Skip chrome-extension requests
-    if (url.protocol === 'chrome-extension:') {
-        return;
-    }
-    
+    if (url.protocol === 'chrome-extension:') return;
+
+    // ── Pass through Cloudinary media entirely — never cache, never intercept ──
+    // Audio/video files are too large for SW caching and must bypass CSP restrictions
+    if (url.hostname.includes('cloudinary.com')) return;
+
+    // ── Pass through socket.io entirely ──
+    if (url.pathname.startsWith('/socket.io/')) return;
+
     // Handle different caching strategies based on URL patterns
     if (isNetworkFirst(request.url)) {
         event.respondWith(networkFirstStrategy(request));
