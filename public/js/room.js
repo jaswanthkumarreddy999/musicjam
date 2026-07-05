@@ -372,7 +372,10 @@ class RoomSocketManager {
                     <div class="drag-handle" title="Drag to reorder">⠿</div>
                     <div class="queue-song-info">
                         <div class="queue-song-title">${this.escapeHtml(song.title)}</div>
-                        <div class="queue-song-artist">${this.escapeHtml(song.artist)}</div>
+                        <div class="queue-song-artist">
+                            ${this.escapeHtml(song.artist)}
+                            ${song.mediaType === 'video' ? ' <span class="media-type-pill video">video</span>' : ''}
+                        </div>
                     </div>
                     <div class="queue-actions">
                         <button class="queue-action-btn remove" data-song-id="${song.id}" title="Remove">✕</button>
@@ -515,6 +518,7 @@ class RoomSocketManager {
                     <div class="lp-song-meta">
                         <span class="lp-artist">${this.escapeHtml(song.artist)}</span>
                         <span class="lp-duration">${this.formatDuration(song.duration)}</span>
+                        ${song.mediaType === 'video' ? '<span class="media-type-pill video">video</span>' : ''}
                     </div>
                 </div>
                 <button class="lp-add-btn" data-song-id="${song.id}" aria-label="Add to queue">

@@ -763,6 +763,168 @@
     .back-btn { padding: 5px 8px; font-size: .78rem; }
 }
 
+/* ── Video Player ── */
+.video-player-wrap {
+    width: 100%;
+}
+
+.video-container {
+    position: relative;
+    width: 100%;
+    background: #000;
+    border-radius: var(--r-md);
+    overflow: hidden;
+    cursor: pointer;
+    /* Maintain 16:9 aspect ratio */
+    aspect-ratio: 16 / 9;
+}
+
+.video-container video {
+    width: 100%; height: 100%;
+    display: block; object-fit: contain;
+    background: #000;
+}
+
+/* Overlay — hidden by default, shown on hover/tap */
+.video-overlay {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    justify-content: space-between;
+    opacity: 0;
+    transition: opacity .2s ease;
+    background: linear-gradient(
+        to bottom,
+        rgba(0,0,0,.55) 0%,
+        transparent 30%,
+        transparent 65%,
+        rgba(0,0,0,.7) 100%
+    );
+}
+.video-overlay.visible { opacity: 1; }
+
+/* Top bar — title + fullscreen */
+.video-title-bar {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    padding: 12px 14px 0; gap: 8px;
+}
+
+.video-title-text {
+    font-size: .82rem; font-weight: 700; color: #fff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    text-shadow: 0 1px 4px rgba(0,0,0,.8);
+}
+
+.video-ctrl-btn {
+    background: rgba(0,0,0,.4);
+    border: none; color: #fff; cursor: pointer;
+    width: 32px; height: 32px; border-radius: var(--r-sm);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    transition: background var(--fast);
+    -webkit-tap-highlight-color: transparent;
+}
+.video-ctrl-btn:hover { background: rgba(255,255,255,.2); }
+
+/* Center play/pause tap area */
+.video-center-play {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px; height: 60px;
+    background: rgba(0,0,0,.5);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff;
+    transition: transform var(--fast), background var(--fast);
+    pointer-events: all;
+}
+.video-center-play:hover { background: rgba(0,0,0,.7); transform: translate(-50%, -50%) scale(1.08); }
+.video-center-play:active { transform: translate(-50%, -50%) scale(.95); }
+
+/* Bottom bar */
+.video-bottom-bar {
+    padding: 0 14px 12px;
+    display: flex; flex-direction: column; gap: 6px;
+}
+
+.video-progress-wrap {
+    display: flex; align-items: center; gap: 8px;
+}
+
+.video-time {
+    font-size: .72rem; font-weight: 600;
+    color: rgba(255,255,255,.9);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap; min-width: 36px;
+    text-shadow: 0 1px 3px rgba(0,0,0,.8);
+}
+
+.video-progress-bar {
+    flex: 1; height: 18px; cursor: pointer;
+    display: flex; align-items: center;
+}
+
+.video-progress-track {
+    width: 100%; height: 3px;
+    background: rgba(255,255,255,.3);
+    border-radius: var(--r-full);
+    position: relative;
+    transition: height var(--fast);
+}
+.video-progress-bar:hover .video-progress-track { height: 5px; }
+
+.video-progress-fill {
+    height: 100%; width: 0%;
+    background: var(--grad-green);
+    border-radius: var(--r-full);
+    position: relative;
+}
+.video-progress-fill::after {
+    content: '';
+    position: absolute; top: 50%; right: -5px;
+    transform: translateY(-50%) scale(0);
+    width: 11px; height: 11px; border-radius: 50%;
+    background: #fff;
+    transition: transform var(--fast);
+}
+.video-progress-bar:hover .video-progress-fill::after { transform: translateY(-50%) scale(1); }
+
+.video-song-info {
+    display: flex; gap: 8px; align-items: center;
+}
+.video-song-name {
+    font-size: .78rem; font-weight: 700; color: rgba(255,255,255,.9);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    text-shadow: 0 1px 3px rgba(0,0,0,.8);
+}
+.video-song-artist-text {
+    font-size: .7rem; color: var(--green);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    flex-shrink: 0;
+}
+
+/* Fullscreen adjustments */
+:fullscreen .video-container,
+:-webkit-full-screen .video-container {
+    border-radius: 0;
+    aspect-ratio: unset;
+    width: 100vw; height: 100vh;
+}
+:fullscreen video,
+:-webkit-full-screen video {
+    width: 100vw; height: 100vh;
+}
+
+/* ── Video type pill in queue/library ── */
+.media-type-pill {
+    display: inline-block;
+    font-size: .62rem; font-weight: 700;
+    padding: 1px 5px; border-radius: var(--r-sm);
+    text-transform: uppercase; letter-spacing: .04em;
+    flex-shrink: 0; line-height: 1.4;
+}
+.media-type-pill.audio { background: var(--green-dim); color: var(--green); }
+.media-type-pill.video { background: hsla(214,90%,60%,.12); color: var(--blue); }
+
 /* ── History panel ── */
 .queue-history {
     border-top: 1px solid var(--border);
