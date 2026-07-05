@@ -53,7 +53,7 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// ── Multer — memory storage (file goes straight to Cloudinary) ─
+// ── Multer — disk storage (prevents OOM on 512MB instances) ──
 const AUDIO_EXTS  = /\.(mp3|wav|ogg|m4a|flac|aac|wma)$/i;
 const VIDEO_EXTS  = /\.(mp4|webm|mov|mkv|avi)$/i;
 const AUDIO_MIME  = ['audio/mpeg','audio/wav','audio/wave','audio/x-wav',
@@ -63,9 +63,17 @@ const AUDIO_MIME  = ['audio/mpeg','audio/wav','audio/wave','audio/x-wav',
 const VIDEO_MIME  = ['video/mp4','video/webm','video/quicktime',
                      'video/x-matroska','video/x-msvideo'];
 
+const uploadDir = path.join(__dirname, 'uploads');
+fs.mkdir(uploadDir, { recursive: true }).catch(console.error);
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => cb(null, `${Date.now()}-${uuidv4().slice(0, 8)}${path.extname(file.originalname)}`)
+});
+
 const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB
+  storage: storage,
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB limit
   fileFilter: (req, file, cb) => {
     const name = file.originalname.toLowerCase();
     const isAudio = AUDIO_EXTS.test(name) || AUDIO_MIME.includes(file.mimetype);
@@ -74,17 +82,6 @@ const upload = multer({
     cb(new Error(`Unsupported file type: ${file.mimetype}`));
   }
 });
-
-// ── Upload helper: buffer → Cloudinary ────────────────────────
-function uploadToCloudinary(buffer, options) {
-  return new Promise((resolve, reject) => {
-    const stream = cloudinary.uploader.upload_stream(options, (err, result) => {
-      if (err) return reject(err);
-      resolve(result);
-    });
-    Readable.from(buffer).pipe(stream);
-  });
-}
 
 // In-memory data storage
 const rooms = new Map();
@@ -458,10 +455,15 @@ app.get('/api/rooms/:code', (req, res) => {
 });
 
 app.post('/api/upload', upload.single('audio'), async (req, res) => {
+  let uploadedFilePath = null;
+  
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file provided' });
     }
+    
+    // Track path for cleanup in finally block
+    uploadedFilePath = req.file.path;
 
     const name = req.file.originalname.toLowerCase();
     const isVideo = VIDEO_EXTS.test(name) || VIDEO_MIME.includes(req.file.mimetype);
@@ -479,19 +481,19 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
       }
     }
 
-    // Upload buffer to Cloudinary — resource_type 'video' handles both audio and video
-    const cloudResult = await uploadToCloudinary(req.file.buffer, {
+    // Upload direct from disk to Cloudinary — resource_type 'video' handles both audio and video efficiently
+    const cloudResult = await cloudinary.uploader.upload(uploadedFilePath, {
       resource_type: 'video',
       folder: 'musicjam',
       public_id: `${Date.now()}-${uuidv4().slice(0, 8)}`,
       use_filename: false,
     });
 
-    // Extract audio metadata from buffer (audio only)
+    // Extract audio metadata directly from the file (audio only)
     let metadata = {};
     if (mediaType === 'audio') {
       try {
-        metadata = await musicMetadata.parseBuffer(req.file.buffer, req.file.mimetype);
+        metadata = await musicMetadata.parseFile(uploadedFilePath);
       } catch (e) {
         console.warn('Metadata extraction failed:', e.message);
       }
@@ -521,6 +523,11 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({ success: false, message: `Upload failed: ${error.message}` });
+  } finally {
+    // ALWAYS clean up the local disk file so Render doesn't run out of storage
+    if (uploadedFilePath) {
+      fs.unlink(uploadedFilePath).catch(err => console.error('Failed to clean up temp file:', err.message));
+    }
   }
 });
 
