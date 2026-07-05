@@ -11,6 +11,8 @@ class AudioPlayer {
         this.currentMediaType = 'audio';
         this._overlayTimer = null;
         this._isFullscreen = false;
+        this._fsMouseTimer = null;
+        this._fsMoveHandler = null;
 
         this.initializeElements();
         this.bindEvents();
@@ -193,6 +195,39 @@ class AudioPlayer {
         const exitIcon  = this.videoFullscreenBtn?.querySelector('.fs-icon-exit');
         if (enterIcon) enterIcon.classList.toggle('hidden', this._isFullscreen);
         if (exitIcon)  exitIcon.classList.toggle('hidden', !this._isFullscreen);
+
+        if (this._isFullscreen) {
+            // Show overlay briefly on fullscreen enter, then auto-hide
+            this._showOverlay();
+            this._overlayTimer = setTimeout(() => {
+                if (!this.media.paused) this._hideOverlay();
+            }, 2500);
+
+            // Show overlay + cursor on mouse move; auto-hide after 3s of no movement
+            this._fsMoveHandler = () => {
+                if (this.videoContainer) this.videoContainer.style.cursor = 'default';
+                this._showOverlay();
+                clearTimeout(this._fsMouseTimer);
+                this._fsMouseTimer = setTimeout(() => {
+                    if (!this.media.paused) {
+                        this._hideOverlay();
+                        if (this.videoContainer) this.videoContainer.style.cursor = 'none';
+                    }
+                }, 3000);
+            };
+            document.addEventListener('mousemove', this._fsMoveHandler);
+        } else {
+            // Cleanup on fullscreen exit
+            if (this._fsMoveHandler) {
+                document.removeEventListener('mousemove', this._fsMoveHandler);
+                this._fsMoveHandler = null;
+            }
+            clearTimeout(this._fsMouseTimer);
+            if (this.videoContainer) this.videoContainer.style.cursor = '';
+            // Keep overlay visible if paused, hide if playing
+            if (this.media.paused) this._showOverlay();
+            else this._hideOverlay();
+        }
     }
 
     _updateVideoVolIcon(v) {
