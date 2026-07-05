@@ -557,56 +557,100 @@ input[type="checkbox"]:indeterminate + .checkbox-custom::after {
     .library-song-card:hover { transform: translateX(2px); }
 }
 
-/* 640–1023px — stack hero, keep side-by-side columns */
+/* 640–1023px — stack hero, keep single column */
 @media (max-width: 1023px) {
-    .hero-inner { grid-template-columns: 1fr; gap: 36px; max-width: 520px; }
-    .hero-title { font-size: clamp(1.9rem, 5vw, 2.8rem); }
+    .hero-inner { grid-template-columns: 1fr; gap: 28px; max-width: 520px; }
+    .hero-title { font-size: clamp(1.6rem, 5vw, 2.6rem); }
     .hero-cta { max-width: 100%; }
-    .content-columns { grid-template-columns: 1fr; gap: 32px; }
+    .content-columns { grid-template-columns: 1fr; gap: 28px; }
 }
 
 /* ≤ 639px — mobile */
 @media (max-width: 639px) {
-    .container { padding: 0 16px; }
+    .container { padding: 0 14px; }
 
-    .hero { padding: 40px 0 32px; }
-    .hero-title { font-size: 1.9rem; }
-    .hero-subtitle { font-size: .9rem; }
+    /* Header — shrink actions, text only */
+    .header { height: 52px; }
+    :root { --header-h: 52px; }
+    .logo-text { font-size: 1.05rem; }
+    .header-actions { gap: 6px; }
+    .header-actions .btn { padding: 6px 10px; font-size: .75rem; gap: 4px; }
+    .header-actions .btn svg { width: 12px; height: 12px; }
 
-    .main-grid { padding: 28px 0 40px; }
+    /* Hero — compact */
+    .hero { padding: 28px 0 24px; }
+    .hero-inner { gap: 20px; }
+    .hero-title { font-size: 1.55rem; letter-spacing: -.03em; margin-bottom: 10px; }
+    .hero-subtitle { font-size: .85rem; line-height: 1.55; }
+    .hero-cta { gap: 10px; }
+    .btn-large { padding: 11px 22px; font-size: .9rem; width: 100%; justify-content: center; }
+    .divider-or { font-size: .72rem; }
+    .room-code-input { font-size: 1rem; padding: 9px 10px; }
+    .join-row { width: 100%; }
 
-    .col-header { flex-wrap: wrap; gap: 8px; }
-    .col-header-actions { flex-wrap: wrap; }
+    /* Main grid */
+    .main-grid { padding: 20px 0 32px; }
+    .content-columns { gap: 20px; }
+    .content-col { gap: 12px; }
 
+    /* Section headers — wrap gracefully */
+    .col-header { padding-bottom: 10px; gap: 6px; }
+    .col-title { font-size: .92rem; }
+    .col-header-actions { gap: 5px; flex-wrap: nowrap; }
+    .col-header-actions .btn-small { padding: 5px 9px; font-size: .73rem; }
+    .col-header-actions .btn-small svg { width: 11px; height: 11px; }
+
+    /* Room cards */
     .rooms-list { gap: 8px; }
-    .room-card { padding: 13px 14px; }
+    .room-card { padding: 12px 13px; gap: 8px; border-radius: var(--r-md); }
+    .room-code { font-size: .95rem; }
+    .room-users, .room-song { font-size: .78rem; }
 
+    /* Library cards */
     .library-song-card { padding: 8px 10px; gap: 8px; }
     .library-song-icon { width: 32px; height: 32px; min-width: 32px; }
-    .library-song-title { font-size: .82rem; }
-    .meta-artist { font-size: .68rem; }
+    .library-song-icon svg { width: 14px; height: 14px; }
+    .library-song-title { font-size: .81rem; }
+    .meta-artist { font-size: .67rem; }
+    .meta-duration { font-size: .67rem; }
     .btn-delete, .btn-icon-action { width: 28px; height: 28px; }
+    .btn-delete svg, .btn-icon-action svg { width: 12px; height: 12px; }
 
-    .bulk-actions { padding: 8px 10px; gap: 8px; }
+    /* Bulk bar */
+    .bulk-actions { padding: 7px 10px; gap: 6px; }
     .bulk-btns { width: 100%; justify-content: flex-end; }
+    .bulk-btns .btn { font-size: .73rem; padding: 5px 9px; }
 
-    .upload-area { padding: 24px 16px; }
-    .upload-icon-wrap { width: 44px; height: 44px; }
+    /* Upload */
+    .upload-area { padding: 22px 14px; }
+    .upload-icon-wrap { width: 42px; height: 42px; }
+    .upload-icon-wrap svg { width: 22px; height: 22px; }
+    .upload-title { font-size: .85rem; }
+    .upload-hint { font-size: .74rem; }
 
-    .modal-overlay { padding: 12px; align-items: flex-end; }
-    .modal { border-radius: var(--r-xl) var(--r-xl) 0 0; max-height: 92dvh; }
+    /* Empty states */
+    .empty-state { padding: 28px 12px; }
+    .empty-icon-wrap { width: 44px; height: 44px; }
+
+    /* Modals — slide up from bottom */
+    .modal-overlay { padding: 0; align-items: flex-end; }
+    .modal { border-radius: var(--r-xl) var(--r-xl) 0 0; max-height: 92dvh; width: 100%; }
     .modal-header { padding: 14px 16px 12px; }
-    .modal-content { padding: 14px 16px 20px; }
+    .modal-content { padding: 14px 16px 28px; }
     .modal-actions { flex-direction: column-reverse; gap: 8px; }
     .modal-actions .btn { width: 100%; }
     .code-box span { font-size: 1.2rem; }
 
+    /* Toasts — full width */
     .toast-container { top: 10px; right: 10px; left: 10px; }
-    .toast { max-width: none; min-width: 0; }
+    .toast { max-width: none; min-width: 0; font-size: .8rem; padding: 10px 13px; }
 }
 
+/* Very small phones ≤ 380px */
 @media (max-width: 380px) {
-    .hero-title { font-size: 1.7rem; }
-    .logo-text { font-size: 1rem; }
-    .room-code-input { font-size: 1rem; }
+    .hero-title { font-size: 1.38rem; }
+    .logo-text { font-size: .95rem; }
+    .header-actions .btn { padding: 5px 8px; font-size: .7rem; }
+    .room-code-input { font-size: .95rem; }
+    .col-header-actions .btn-small { padding: 4px 7px; font-size: .7rem; }
 }
