@@ -54,16 +54,7 @@ app.use(express.json({ limit: '1000mb' }));
 app.use(express.urlencoded({ limit: '1000mb', extended: true }));
 app.use(express.static('public'));
 
-// Serve persistent uploads directly
-const uploadDir = path.join(__dirname, 'uploads');
-try {
-  require('fs').mkdirSync(uploadDir, { recursive: true });
-} catch (e) {
-  // Ignore if exists
-}
-app.use('/uploads', express.static(uploadDir));
-
-// ── Multer — disk storage (bypasses Cloudinary limits completely) ──
+// ── Multer — disk storage (prevents OOM on 512MB instances) ──
 const AUDIO_EXTS  = /\.(mp3|wav|ogg|m4a|flac|aac|wma)$/i;
 const VIDEO_EXTS  = /\.(mp4|webm|mov|mkv|avi)$/i;
 const AUDIO_MIME  = ['audio/mpeg','audio/wav','audio/wave','audio/x-wav',
@@ -72,6 +63,13 @@ const AUDIO_MIME  = ['audio/mpeg','audio/wav','audio/wave','audio/x-wav',
                      'application/octet-stream'];
 const VIDEO_MIME  = ['video/mp4','video/webm','video/quicktime',
                      'video/x-matroska','video/x-msvideo'];
+
+const uploadDir = path.join(__dirname, 'uploads');
+try {
+  require('fs').mkdirSync(uploadDir, { recursive: true });
+} catch (e) {
+  // Ignore if exists
+}
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
@@ -463,14 +461,13 @@ app.get('/api/rooms/:code', (req, res) => {
 
 app.post('/api/upload', upload.single('audio'), async (req, res) => {
   let uploadedFilePath = null;
-  let processingFailed = false;
   
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file provided' });
     }
     
-    // File remains on disk permanently now
+    // Track path for cleanup in finally block
     uploadedFilePath = req.file.path;
 
     const name = req.file.originalname.toLowerCase();
@@ -482,7 +479,6 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
     for (const existing of songs.values()) {
       const existingNoExt = path.parse((existing.originalName || '').toLowerCase().trim()).name;
       if (existingNoExt === incomingNoExt) {
-        processingFailed = true; // flag for cleanup
         return res.status(409).json({
           success: false,
           message: `"${existing.title}" already exists in your library`
@@ -490,7 +486,16 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
       }
     }
 
-    // Extract audio metadata directly from the file
+    // Upload direct from disk to Cloudinary using upload_large (handles chunking for files >100MB!)
+    const cloudResult = await cloudinary.uploader.upload_large(uploadedFilePath, {
+      resource_type: 'video',
+      folder: 'musicjam',
+      public_id: `${Date.now()}-${uuidv4().slice(0, 8)}`,
+      use_filename: false,
+      chunk_size: 20000000 // 20MB chunks
+    });
+
+    // Extract audio metadata directly from the file (audio only)
     let metadata = {};
     if (mediaType === 'audio') {
       try {
@@ -500,22 +505,20 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
       }
     }
 
-    const fileUrl = `/uploads/${path.basename(uploadedFilePath)}`;
-
     const song = {
       id: uuidv4(),
-      cloudinaryId: null, // Legacy flag
+      cloudinaryId: cloudResult.public_id,
       originalName: req.file.originalname,
       title: metadata.common?.title || path.parse(req.file.originalname).name,
       artist: metadata.common?.artist || 'Unknown Artist',
       album: metadata.common?.album || '',
-      duration: metadata.format?.duration || 0,
+      duration: metadata.format?.duration || cloudResult.duration || 0,
       size: req.file.size,
       uploadedAt: Date.now(),
-      url: fileUrl,                      // Local URL
+      url: cloudResult.secure_url,      // permanent Cloudinary URL
       mediaType,                         // 'audio' | 'video'
-      path: fileUrl,                     // Local URL
-      localPath: uploadedFilePath        // Absolute internal path for deletion
+      // keep path for backwards compat
+      path: cloudResult.secure_url,
     };
 
     songs.set(song.id, song);
@@ -524,13 +527,12 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
 
     res.json({ success: true, song });
   } catch (error) {
-    processingFailed = true;
     console.error('Upload error:', error);
     res.status(500).json({ success: false, message: `Upload failed: ${error.message}` });
   } finally {
-    // Only cleanup the file if we explicitly rejected it or an error crashed the request
-    if (processingFailed && uploadedFilePath) {
-      require('fs').promises.unlink(uploadedFilePath).catch(err => console.error('Failed to clean up temp file:', err.message));
+    // ALWAYS clean up the local disk file so Render doesn't run out of storage
+    if (uploadedFilePath) {
+      fs.unlink(uploadedFilePath).catch(err => console.error('Failed to clean up temp file:', err.message));
     }
   }
 });
@@ -565,17 +567,11 @@ app.delete('/api/library/:songId', async (req, res) => {
   }
 
   try {
-    // Delete legacy Cloudinary files if they exist
+    // Cloudinary uses resource_type 'video' for both audio and video files
     if (song.cloudinaryId) {
       await cloudinary.uploader.destroy(song.cloudinaryId, {
         resource_type: 'video'
       }).catch(e => console.warn('Cloudinary delete warning:', e.message));
-    }
-    
-    // Delete local persistent file
-    if (song.localPath) {
-      await require('fs').promises.unlink(song.localPath)
-        .catch(e => console.warn('Failed to delete local file:', e.message));
     }
 
     songs.delete(songId);
