@@ -3,569 +3,537 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Storage Dashboard - MusicJam</title>
-    <link rel="stylesheet" href="/css/style.css?v=1.5">
+    <title>Dashboard — MusicJam</title>
+    <link rel="stylesheet" href="/css/style.css?v=3.0">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        .dashboard-container {
-            max-width: 1200px;
+        /* ── Dashboard-specific styles ── */
+        body { min-height: 100dvh; }
+
+        .dash-wrap {
+            max-width: 1100px;
             margin: 0 auto;
-            padding: var(--spacing-xl);
+            padding: 0 24px 56px;
         }
-        
-        .dashboard-header {
-            text-align: center;
-            margin-bottom: var(--spacing-xxl);
+
+        /* ── Page header ── */
+        .dash-header {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 12px; flex-wrap: wrap;
+            padding: 32px 0 28px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 32px;
         }
-        
-        .dashboard-title {
-            font-size: 2.5rem;
-            font-weight: 800;
-            margin-bottom: var(--spacing-sm);
-            background: linear-gradient(135deg, #fff, var(--primary-color));
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
+        .dash-header-left h1 {
+            font-size: 1.5rem; font-weight: 800; letter-spacing: -.025em;
+            color: var(--txt); margin-bottom: 3px;
         }
-        
+        .dash-header-left p {
+            font-size: .82rem; color: var(--txt3);
+        }
+        .dash-header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+        /* ── Stats grid ── */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: var(--spacing-xl);
-            margin-bottom: var(--spacing-xxl);
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
         }
-        
         .stat-card {
-            background: var(--card-color);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
-            padding: var(--spacing-xl);
-            backdrop-filter: blur(12px);
-            transition: all var(--transition-normal);
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--r-lg);
+            padding: 18px 20px;
+            display: flex; flex-direction: column; gap: 8px;
+            transition: border-color var(--normal), transform var(--normal);
         }
-        
-        .stat-card:hover {
-            transform: translateY(-5px);
-            border-color: rgba(255, 255, 255, 0.15);
-            box-shadow: var(--shadow-md);
+        .stat-card:hover { border-color: var(--border-md); transform: translateY(-2px); }
+        .stat-icon-wrap {
+            width: 36px; height: 36px;
+            border-radius: var(--r-md);
+            display: flex; align-items: center; justify-content: center;
+            margin-bottom: 4px;
         }
-        
-        .stat-icon {
-            font-size: 2.5rem;
-            margin-bottom: var(--spacing-md);
-            display: block;
-        }
-        
+        .stat-icon-wrap.green { background: var(--green-dim); color: var(--green); border: 1px solid hsla(152,88%,48%,.2); }
+        .stat-icon-wrap.blue  { background: hsla(214,90%,60%,.12); color: var(--blue); border: 1px solid hsla(214,90%,60%,.25); }
+        .stat-icon-wrap.yellow{ background: hsla(38,95%,56%,.12); color: var(--yellow); border: 1px solid hsla(38,95%,56%,.25); }
+        .stat-icon-wrap.red   { background: hsla(4,80%,60%,.12); color: var(--red); border: 1px solid hsla(4,80%,60%,.25); }
         .stat-value {
-            font-size: 2rem;
-            font-weight: 800;
-            color: var(--primary-color);
-            margin-bottom: var(--spacing-xs);
+            font-size: 1.7rem; font-weight: 900; letter-spacing: -.03em;
+            color: var(--txt); line-height: 1;
         }
-        
         .stat-label {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+            font-size: .74rem; font-weight: 600;
+            color: var(--txt3); text-transform: uppercase; letter-spacing: .06em;
         }
-        
-        .storage-visual {
-            background: var(--card-color);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
-            padding: var(--spacing-xl);
-            margin-bottom: var(--spacing-xxl);
+
+        /* ── Storage bar ── */
+        .storage-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--r-lg);
+            padding: 20px 22px;
+            margin-bottom: 24px;
         }
-        
-        .storage-bar-container {
-            margin: var(--spacing-xl) 0;
+        .storage-card-header {
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 16px; gap: 8px;
         }
-        
-        .storage-bar {
-            width: 100%;
-            height: 20px;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: var(--radius-full);
-            overflow: hidden;
-            position: relative;
+        .storage-card-header h2 {
+            font-size: .9rem; font-weight: 700; color: var(--txt);
         }
-        
+        .storage-badge {
+            font-size: .72rem; font-weight: 700; padding: 3px 9px;
+            border-radius: var(--r-full); letter-spacing: .04em;
+        }
+        .storage-badge.ok     { background: var(--green-dim); color: var(--green); }
+        .storage-badge.warn   { background: hsla(38,95%,56%,.15); color: var(--yellow); }
+        .storage-badge.danger { background: hsla(4,80%,60%,.15); color: var(--red); }
+        .storage-track {
+            width: 100%; height: 8px;
+            background: rgba(255,255,255,.06);
+            border-radius: var(--r-full); overflow: hidden;
+            margin-bottom: 10px;
+        }
         .storage-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--primary-color), #00d4aa);
-            border-radius: var(--radius-full);
-            transition: width 0.6s ease-out;
-            position: relative;
+            height: 100%; border-radius: var(--r-full);
+            background: var(--grad-green);
+            transition: width .6s ease-out;
         }
-        
-        .storage-fill.warning {
-            background: linear-gradient(90deg, #ffa726, #ff7043);
+        .storage-fill.warn   { background: linear-gradient(90deg, var(--yellow), hsl(30,95%,55%)); }
+        .storage-fill.danger { background: linear-gradient(90deg, var(--red), hsl(10,80%,55%)); }
+        .storage-meta {
+            display: flex; justify-content: space-between;
+            font-size: .76rem; color: var(--txt3);
         }
-        
-        .storage-fill.danger {
-            background: linear-gradient(90deg, #ef5350, #e53935);
-        }
-        
-        .storage-labels {
-            display: flex;
-            justify-content: space-between;
-            margin-top: var(--spacing-sm);
-            font-size: 0.85rem;
-            color: var(--text-secondary);
-        }
-        
-        .songs-table {
-            background: var(--card-color);
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-lg);
+
+        /* ── Library table ── */
+        .library-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--r-lg);
             overflow: hidden;
         }
-        
-        .table-header {
-            background: rgba(255, 255, 255, 0.03);
-            padding: var(--spacing-lg);
-            border-bottom: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .library-card-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 18px; gap: 8px;
+            border-bottom: 1px solid var(--border);
         }
-        
-        .songs-list {
-            max-height: 500px;
-            overflow-y: auto;
+        .library-card-header h2 {
+            font-size: .9rem; font-weight: 700; color: var(--txt);
         }
-        
-        .song-row {
-            display: grid;
-            grid-template-columns: 1fr 120px 100px 120px 80px;
-            gap: var(--spacing-md);
-            padding: var(--spacing-md) var(--spacing-lg);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-            align-items: center;
-            transition: background var(--transition-fast);
+        .songs-count-badge {
+            font-size: .74rem; font-weight: 700; color: var(--green);
+            background: var(--green-dim); padding: 2px 9px;
+            border-radius: var(--r-full);
         }
-        
-        .song-row:hover {
-            background: rgba(255, 255, 255, 0.03);
+
+        /* Table */
+        .table-wrap { overflow-x: auto; }
+        table {
+            width: 100%; border-collapse: collapse;
+            font-size: .83rem;
         }
-        
-        .song-info {
-            min-width: 0;
+        thead tr {
+            border-bottom: 1px solid var(--border);
         }
-        
-        .song-title {
-            font-weight: 600;
-            color: var(--text-primary);
-            font-size: 0.9rem;
+        th {
+            padding: 10px 16px;
+            text-align: left; font-size: .7rem; font-weight: 700;
+            color: var(--txt3); text-transform: uppercase; letter-spacing: .06em;
             white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
         }
-        
-        .song-artist {
-            color: var(--text-secondary);
-            font-size: 0.8rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        td {
+            padding: 11px 16px;
+            color: var(--txt2); vertical-align: middle;
+            border-bottom: 1px solid rgba(255,255,255,.03);
         }
-        
-        .song-size {
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-            text-align: right;
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover td { background: rgba(255,255,255,.025); }
+
+        .td-title { min-width: 0; }
+        .song-name {
+            font-weight: 600; color: var(--txt); font-size: .85rem;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            max-width: 260px; display: block;
         }
-        
-        .song-duration {
-            color: var(--text-secondary);
-            font-size: 0.85rem;
-            text-align: center;
+        .song-artist-text {
+            font-size: .75rem; color: var(--green-text);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            max-width: 260px; display: block;
+            margin-top: 1px;
         }
-        
-        .song-date {
-            color: var(--text-secondary);
-            font-size: 0.8rem;
-            text-align: center;
+        .td-size, .td-dur, .td-date { white-space: nowrap; font-size: .78rem; }
+        .td-type { white-space: nowrap; }
+        .media-pill {
+            display: inline-block; font-size: .68rem; font-weight: 700;
+            padding: 2px 7px; border-radius: var(--r-full);
+            text-transform: uppercase; letter-spacing: .04em;
         }
-        
-        .song-actions {
-            text-align: center;
-        }
-        
-        .delete-btn {
+        .media-pill.audio { background: var(--green-dim); color: var(--green); }
+        .media-pill.video { background: hsla(214,90%,60%,.12); color: var(--blue); }
+        .td-action { text-align: right; white-space: nowrap; }
+        .del-btn {
             background: transparent;
-            border: 1px solid rgba(239, 83, 80, 0.3);
-            color: #ef5350;
-            padding: 0.3rem 0.6rem;
-            border-radius: var(--radius-sm);
-            font-size: 0.75rem;
-            cursor: pointer;
-            transition: all var(--transition-fast);
+            border: 1px solid hsla(4,80%,60%,.2);
+            color: var(--red);
+            padding: 5px 10px; border-radius: var(--r-sm);
+            font-size: .74rem; font-weight: 600;
+            cursor: pointer; transition: all var(--fast);
+            display: inline-flex; align-items: center; gap: 5px;
+            -webkit-tap-highlight-color: transparent;
         }
-        
-        .delete-btn:hover {
-            background: rgba(239, 83, 80, 0.1);
-            border-color: #ef5350;
+        .del-btn:hover { background: hsla(4,80%,60%,.1); border-color: var(--red); }
+        .del-btn svg { flex-shrink: 0; }
+
+        /* Empty state */
+        .table-empty {
+            text-align: center; padding: 48px 20px; color: var(--txt2);
         }
-        
-        .loading {
-            text-align: center;
-            padding: var(--spacing-xxl);
-            color: var(--text-secondary);
+        .table-empty svg { color: var(--txt3); margin-bottom: 12px; }
+        .table-empty p { font-size: .88rem; }
+        .table-empty small { font-size: .78rem; color: var(--txt3); }
+
+        /* Loading */
+        .dash-loading {
+            display: flex; flex-direction: column; align-items: center;
+            gap: 14px; padding: 80px 20px; color: var(--txt2);
+            font-size: .88rem;
         }
-        
-        .loading-spinner {
-            width: 30px;
-            height: 30px;
-            border: 3px solid rgba(255, 255, 255, 0.1);
-            border-top: 3px solid var(--primary-color);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto var(--spacing-md);
+
+        /* ── Responsive ── */
+        @media (max-width: 900px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
         }
-        
-        .actions-bar {
-            display: flex;
-            gap: var(--spacing-md);
-            margin-bottom: var(--spacing-xl);
-            flex-wrap: wrap;
+        @media (max-width: 639px) {
+            .dash-wrap { padding: 0 14px 40px; }
+            .dash-header { padding: 22px 0 20px; margin-bottom: 20px; flex-direction: column; align-items: flex-start; }
+            .dash-header-left h1 { font-size: 1.2rem; }
+            .dash-header-actions { width: 100%; }
+            .dash-header-actions .btn { flex: 1; justify-content: center; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .stat-card { padding: 14px 14px; }
+            .stat-value { font-size: 1.35rem; }
+            .storage-card { padding: 14px 16px; }
+            .library-card-header { padding: 12px 14px; }
+            th { padding: 8px 12px; }
+            td { padding: 9px 12px; }
+            /* Hide less important columns on mobile */
+            .td-date, .td-size, .th-date, .th-size { display: none; }
+            .song-name { max-width: 160px; }
         }
-        
-        .refresh-btn {
-            background: var(--primary-gradient);
-            color: var(--secondary-color);
-        }
-        
-        .clear-all-btn {
-            background: transparent;
-            border: 1px solid rgba(239, 83, 80, 0.3);
-            color: #ef5350;
-        }
-        
-        .clear-all-btn:hover {
-            background: rgba(239, 83, 80, 0.1);
-            border-color: #ef5350;
-        }
-        
-        @media (max-width: 768px) {
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .song-row {
-                grid-template-columns: 1fr 80px 60px;
-                gap: var(--spacing-sm);
-            }
-            
-            .song-duration, .song-date {
-                display: none;
-            }
-            
-            .actions-bar {
-                flex-direction: column;
-            }
+        @media (max-width: 400px) {
+            .stats-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+            .stat-value { font-size: 1.2rem; }
+            .stat-label { font-size: .67rem; }
         }
     </style>
 </head>
 <body>
-    <div class="dashboard-container">
-        <!-- Header -->
-        <div class="dashboard-header">
-            <h1 class="dashboard-title">🎵 Storage Dashboard</h1>
-            <p style="color: var(--text-secondary); margin-bottom: var(--spacing-md);">
-                Manage your music library and monitor storage usage
-            </p>
-            <div class="actions-bar">
-                <a href="/" class="btn btn-secondary">← Back to Home</a>
-                <button id="refresh-btn" class="btn btn-primary refresh-btn">🔄 Refresh</button>
-                <button id="clear-all-btn" class="btn clear-all-btn">🗑️ Clear All Songs</button>
+    <!-- Shared header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <a href="/" class="logo">
+                    <svg class="logo-icon" width="22" height="22" viewBox="0 0 24 24" fill="none">
+                        <path d="M9 18V5l12-2v13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="2.2"/>
+                        <circle cx="18" cy="16" r="3" stroke="currentColor" stroke-width="2.2"/>
+                    </svg>
+                    <span class="logo-text">MusicJam</span>
+                </a>
+                <div class="header-actions">
+                    <a href="/" class="btn btn-ghost btn-small">← Home</a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="dash-wrap">
+
+        <!-- Page heading -->
+        <div class="dash-header">
+            <div class="dash-header-left">
+                <h1>Storage Dashboard</h1>
+                <p>Monitor your Cloudinary library and manage uploaded files</p>
+            </div>
+            <div class="dash-header-actions">
+                <button id="refresh-btn" class="btn btn-secondary btn-small">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                        <path d="M3 3v5h5"/>
+                    </svg>
+                    Refresh
+                </button>
+                <button id="clear-all-btn" class="btn btn-ghost btn-small danger-text">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                        <polyline points="3,6 5,6 21,6"/>
+                        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                        <path d="M10 11v6M14 11v6"/>
+                        <path d="M9 6V4h6v2"/>
+                    </svg>
+                    Clear all
+                </button>
             </div>
         </div>
 
-        <!-- Loading State -->
-        <div id="loading" class="loading">
+        <!-- Loading -->
+        <div id="dash-loading" class="dash-loading">
             <div class="loading-spinner"></div>
-            <p>Loading storage data...</p>
+            <span>Loading…</span>
         </div>
 
-        <!-- Dashboard Content -->
-        <div id="dashboard-content" class="hidden">
-            <!-- Stats Grid -->
+        <!-- Content -->
+        <div id="dash-content" class="hidden">
+
+            <!-- Stats -->
             <div class="stats-grid">
                 <div class="stat-card">
-                    <span class="stat-icon">🎵</span>
-                    <div class="stat-value" id="total-songs">0</div>
-                    <div class="stat-label">Total Songs</div>
+                    <div class="stat-icon-wrap green">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <path d="M9 18V5l12-2v13"/>
+                            <circle cx="6" cy="18" r="3"/>
+                            <circle cx="18" cy="16" r="3"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value" id="stat-total">0</div>
+                    <div class="stat-label">Total Files</div>
                 </div>
-                
                 <div class="stat-card">
-                    <span class="stat-icon">💾</span>
-                    <div class="stat-value" id="storage-used">0 MB</div>
+                    <div class="stat-icon-wrap blue">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <ellipse cx="12" cy="5" rx="9" ry="3"/>
+                            <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>
+                            <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value" id="stat-used">0 MB</div>
                     <div class="stat-label">Storage Used</div>
                 </div>
-                
                 <div class="stat-card">
-                    <span class="stat-icon">🆓</span>
-                    <div class="stat-value" id="storage-free">1000 MB</div>
-                    <div class="stat-label">Available Space</div>
+                    <div class="stat-icon-wrap yellow">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7,10 12,15 17,10"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                    </div>
+                    <div class="stat-value" id="stat-free">1000 MB</div>
+                    <div class="stat-label">Available</div>
                 </div>
-                
                 <div class="stat-card">
-                    <span class="stat-icon">📊</span>
-                    <div class="stat-value" id="storage-percent">0%</div>
-                    <div class="stat-label">Storage Used</div>
-                </div>
-            </div>
-
-            <!-- Storage Visual -->
-            <div class="storage-visual">
-                <h3 style="margin-bottom: var(--spacing-md); color: var(--text-primary);">
-                    📈 Storage Usage (1GB Total)
-                </h3>
-                <div class="storage-bar-container">
-                    <div class="storage-bar">
-                        <div id="storage-fill" class="storage-fill" style="width: 0%"></div>
+                    <div class="stat-icon-wrap red">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <line x1="18" y1="20" x2="18" y2="10"/>
+                            <line x1="12" y1="20" x2="12" y2="4"/>
+                            <line x1="6" y1="20" x2="6" y2="14"/>
+                        </svg>
                     </div>
-                    <div class="storage-labels">
-                        <span>0 MB</span>
-                        <span>1000 MB</span>
-                    </div>
-                </div>
-                <p id="storage-status" style="text-align: center; margin-top: var(--spacing-md); color: var(--text-secondary);">
-                    Plenty of space available
-                </p>
-            </div>
-
-            <!-- Songs Table -->
-            <div class="songs-table">
-                <div class="table-header">
-                    <h3 style="color: var(--text-primary); margin: 0;">📚 Music Library</h3>
-                    <span id="songs-count" style="color: var(--text-secondary);">0 songs</span>
-                </div>
-                
-                <div id="songs-list" class="songs-list">
-                    <!-- Songs will be populated here -->
+                    <div class="stat-value" id="stat-pct">0%</div>
+                    <div class="stat-label">Capacity</div>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Toast Container -->
+            <!-- Storage bar -->
+            <div class="storage-card">
+                <div class="storage-card-header">
+                    <h2>Storage Usage — 1 GB limit (Cloudinary free tier)</h2>
+                    <span id="storage-badge" class="storage-badge ok">Healthy</span>
+                </div>
+                <div class="storage-track">
+                    <div id="storage-fill" class="storage-fill" style="width:0%"></div>
+                </div>
+                <div class="storage-meta">
+                    <span>0 MB used</span>
+                    <span id="storage-meta-right">1000 MB free</span>
+                </div>
+            </div>
+
+            <!-- Library table -->
+            <div class="library-card">
+                <div class="library-card-header">
+                    <h2>Library</h2>
+                    <span class="songs-count-badge" id="songs-count">0 files</span>
+                </div>
+                <div class="table-wrap">
+                    <table id="songs-table">
+                        <thead>
+                            <tr>
+                                <th>Title</th>
+                                <th class="td-type">Type</th>
+                                <th class="th-size td-size">Size</th>
+                                <th>Duration</th>
+                                <th class="th-date td-date">Added</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="songs-tbody">
+                            <tr>
+                                <td colspan="6">
+                                    <div class="table-empty">
+                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                                        <p>No files uploaded yet</p>
+                                        <small>Go to the home page to upload music or video</small>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div><!-- /dash-content -->
+    </div><!-- /dash-wrap -->
+
     <div id="toast-container" class="toast-container"></div>
 
     <script>
-        class StorageDashboard {
-            constructor() {
-                this.storageData = null;
-                this.songs = [];
-                this.init();
+    class StorageDashboard {
+        constructor() {
+            this.storageData = null;
+            this.songs = [];
+            document.getElementById('refresh-btn').addEventListener('click', () => this.loadData(true));
+            document.getElementById('clear-all-btn').addEventListener('click', () => this.clearAll());
+            this.loadData(true);
+            setInterval(() => this.loadData(false), 30000);
+        }
+
+        async loadData(showLoading = false) {
+            if (showLoading) {
+                document.getElementById('dash-loading').classList.remove('hidden');
+                document.getElementById('dash-content').classList.add('hidden');
             }
-
-            init() {
-                this.bindEvents();
-                this.loadData();
-                // Auto-refresh every 30 seconds
-                setInterval(() => this.loadData(false), 30000);
-            }
-
-            bindEvents() {
-                document.getElementById('refresh-btn').addEventListener('click', () => this.loadData(true));
-                document.getElementById('clear-all-btn').addEventListener('click', () => this.clearAllSongs());
-            }
-
-            async loadData(showLoading = true) {
-                if (showLoading) {
-                    document.getElementById('loading').classList.remove('hidden');
-                    document.getElementById('dashboard-content').classList.add('hidden');
-                }
-
-                try {
-                    const response = await fetch('/api/library');
-                    const data = await response.json();
-
-                    if (data.success) {
-                        this.storageData = data.storage;
-                        this.songs = data.songs;
-                        this.renderDashboard();
-                    } else {
-                        throw new Error('Failed to load storage data');
-                    }
-                } catch (error) {
-                    console.error('Error loading data:', error);
-                    this.showToast('Failed to load storage data', 'error');
-                } finally {
-                    if (showLoading) {
-                        document.getElementById('loading').classList.add('hidden');
-                        document.getElementById('dashboard-content').classList.remove('hidden');
-                    }
-                }
-            }
-
-            renderDashboard() {
-                if (!this.storageData) return;
-
-                // Update stats
-                document.getElementById('total-songs').textContent = this.storageData.songCount;
-                document.getElementById('storage-used').textContent = `${this.storageData.totalSizeMB} MB`;
-                document.getElementById('storage-free').textContent = `${this.storageData.availableMB} MB`;
-                document.getElementById('storage-percent').textContent = `${this.storageData.percentUsed}%`;
-
-                // Update storage bar
-                const fillElement = document.getElementById('storage-fill');
-                const percent = this.storageData.percentUsed;
-                
-                fillElement.style.width = `${percent}%`;
-                fillElement.className = 'storage-fill';
-                
-                if (percent > 90) {
-                    fillElement.classList.add('danger');
-                } else if (percent > 70) {
-                    fillElement.classList.add('warning');
-                }
-
-                // Update storage status
-                const statusElement = document.getElementById('storage-status');
-                if (percent > 90) {
-                    statusElement.textContent = `⚠️ Storage almost full! Only ${this.storageData.availableMB} MB remaining`;
-                    statusElement.style.color = '#ef5350';
-                } else if (percent > 70) {
-                    statusElement.textContent = `⚠️ Storage getting full. ${this.storageData.availableMB} MB remaining`;
-                    statusElement.style.color = '#ffa726';
-                } else {
-                    statusElement.textContent = `✅ Plenty of space available - ${this.storageData.availableMB} MB free`;
-                    statusElement.style.color = 'var(--text-secondary)';
-                }
-
-                // Update songs count
-                document.getElementById('songs-count').textContent = `${this.songs.length} song${this.songs.length !== 1 ? 's' : ''}`;
-
-                // Render songs list
-                this.renderSongsList();
-            }
-
-            renderSongsList() {
-                const songsListElement = document.getElementById('songs-list');
-                
-                if (this.songs.length === 0) {
-                    songsListElement.innerHTML = `
-                        <div style="text-align: center; padding: var(--spacing-xxl); color: var(--text-secondary);">
-                            <div style="font-size: 3rem; margin-bottom: var(--spacing-md);">🎵</div>
-                            <p>No songs uploaded yet</p>
-                            <p style="font-size: 0.9rem;">Upload some music to get started!</p>
-                        </div>
-                    `;
-                    return;
-                }
-
-                songsListElement.innerHTML = this.songs.map(song => `
-                    <div class="song-row">
-                        <div class="song-info">
-                            <div class="song-title">${this.escapeHtml(song.title)}</div>
-                            <div class="song-artist">${this.escapeHtml(song.artist)}</div>
-                        </div>
-                        <div class="song-size">${this.formatSize(song.size)}</div>
-                        <div class="song-duration">${this.formatDuration(song.duration)}</div>
-                        <div class="song-date">${this.formatDate(song.uploadedAt)}</div>
-                        <div class="song-actions">
-                            <button class="delete-btn" onclick="dashboard.deleteSong('${song.id}')">🗑️</button>
-                        </div>
-                    </div>
-                `).join('');
-            }
-
-            async deleteSong(songId) {
-                const song = this.songs.find(s => s.id === songId);
-                if (!song) return;
-
-                const confirmed = confirm(`Delete "${song.title}"?\nThis action cannot be undone.`);
-                if (!confirmed) return;
-
-                try {
-                    const response = await fetch(`/api/library/${songId}`, {
-                        method: 'DELETE'
-                    });
-
-                    const data = await response.json();
-
-                    if (data.success) {
-                        this.showToast('Song deleted successfully', 'success');
-                        this.loadData(false); // Refresh without loading screen
-                    } else {
-                        throw new Error(data.message || 'Failed to delete song');
-                    }
-                } catch (error) {
-                    console.error('Error deleting song:', error);
-                    this.showToast('Failed to delete song', 'error');
-                }
-            }
-
-            async clearAllSongs() {
-                if (this.songs.length === 0) {
-                    this.showToast('No songs to delete', 'info');
-                    return;
-                }
-
-                const confirmed = confirm(`Delete ALL ${this.songs.length} songs?\nThis action cannot be undone and will free up ${this.storageData.totalSizeMB} MB of storage.`);
-                if (!confirmed) return;
-
-                try {
-                    const deletePromises = this.songs.map(song => 
-                        fetch(`/api/library/${song.id}`, { method: 'DELETE' })
-                    );
-
-                    await Promise.all(deletePromises);
-
-                    this.showToast('All songs deleted successfully', 'success');
-                    this.loadData(false); // Refresh without loading screen
-                } catch (error) {
-                    console.error('Error clearing library:', error);
-                    this.showToast('Failed to clear library', 'error');
-                }
-            }
-
-            formatSize(bytes) {
-                if (!bytes) return '0 MB';
-                const mb = bytes / (1024 * 1024);
-                return `${mb.toFixed(1)} MB`;
-            }
-
-            formatDuration(seconds) {
-                if (!seconds) return '0:00';
-                const minutes = Math.floor(seconds / 60);
-                const remainingSeconds = Math.floor(seconds % 60);
-                return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-            }
-
-            formatDate(timestamp) {
-                return new Date(timestamp).toLocaleDateString();
-            }
-
-            escapeHtml(text) {
-                const div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML;
-            }
-
-            showToast(message, type = 'info') {
-                const container = document.getElementById('toast-container');
-                const toast = document.createElement('div');
-                toast.className = `toast ${type}`;
-                toast.innerHTML = `<span>${this.escapeHtml(message)}</span>`;
-                container.appendChild(toast);
-
-                setTimeout(() => {
-                    if (toast.parentNode) {
-                        toast.parentNode.removeChild(toast);
-                    }
-                }, 4000);
+            try {
+                const res  = await fetch('/api/library');
+                const data = await res.json();
+                if (!data.success) throw new Error('Failed to load');
+                this.storageData = data.storage;
+                this.songs = data.songs;
+                this.render();
+            } catch (e) {
+                this.showToast('Failed to load library data', 'error');
+            } finally {
+                document.getElementById('dash-loading').classList.add('hidden');
+                document.getElementById('dash-content').classList.remove('hidden');
             }
         }
 
-        // Initialize dashboard
-        const dashboard = new StorageDashboard();
+        render() {
+            const s = this.storageData;
+            if (!s) return;
+
+            // Stats
+            document.getElementById('stat-total').textContent = s.songCount;
+            document.getElementById('stat-used').textContent  = `${s.totalSizeMB} MB`;
+            document.getElementById('stat-free').textContent  = `${s.availableMB} MB`;
+            document.getElementById('stat-pct').textContent   = `${s.percentUsed}%`;
+
+            // Storage bar
+            const fill  = document.getElementById('storage-fill');
+            const badge = document.getElementById('storage-badge');
+            const pct   = parseFloat(s.percentUsed);
+            fill.style.width = `${pct}%`;
+            fill.className   = 'storage-fill' + (pct > 90 ? ' danger' : pct > 70 ? ' warn' : '');
+            badge.textContent = pct > 90 ? 'Critical' : pct > 70 ? 'High' : 'Healthy';
+            badge.className   = 'storage-badge ' + (pct > 90 ? 'danger' : pct > 70 ? 'warn' : 'ok');
+            document.getElementById('storage-meta-right').textContent = `${s.availableMB} MB free`;
+
+            // Songs count
+            document.getElementById('songs-count').textContent =
+                `${this.songs.length} file${this.songs.length !== 1 ? 's' : ''}`;
+
+            // Table
+            const tbody = document.getElementById('songs-tbody');
+            if (this.songs.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6"><div class="table-empty">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                    <p>No files uploaded yet</p>
+                    <small>Upload music or video from the home page</small>
+                </div></td></tr>`;
+                return;
+            }
+            tbody.innerHTML = this.songs.map(song => `
+                <tr>
+                    <td class="td-title">
+                        <span class="song-name">${this.esc(song.title)}</span>
+                        <span class="song-artist-text">${this.esc(song.artist)}</span>
+                    </td>
+                    <td class="td-type">
+                        <span class="media-pill ${song.mediaType === 'video' ? 'video' : 'audio'}">
+                            ${song.mediaType === 'video' ? 'Video' : 'Audio'}
+                        </span>
+                    </td>
+                    <td class="td-size">${this.fmtSize(song.size)}</td>
+                    <td class="td-dur">${this.fmtDur(song.duration)}</td>
+                    <td class="td-date">${this.fmtDate(song.uploadedAt)}</td>
+                    <td class="td-action">
+                        <button class="del-btn" onclick="dash.del('${song.id}')">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                                <polyline points="3,6 5,6 21,6"/>
+                                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                            </svg>
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async del(id) {
+            const song = this.songs.find(s => s.id === id);
+            if (!song) return;
+            if (!confirm(`Delete "${song.title}"? This cannot be undone.`)) return;
+            try {
+                const res  = await fetch(`/api/library/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!data.success) throw new Error(data.message);
+                this.showToast('Deleted successfully', 'success');
+                this.loadData(false);
+            } catch (e) {
+                this.showToast('Delete failed', 'error');
+            }
+        }
+
+        async clearAll() {
+            if (!this.songs.length) { this.showToast('Nothing to delete', 'info'); return; }
+            if (!confirm(`Delete all ${this.songs.length} files? This cannot be undone.`)) return;
+            try {
+                await Promise.all(this.songs.map(s => fetch(`/api/library/${s.id}`, { method: 'DELETE' })));
+                this.showToast('All files deleted', 'success');
+                this.loadData(false);
+            } catch (e) {
+                this.showToast('Failed to clear library', 'error');
+            }
+        }
+
+        fmtSize(b) {
+            if (!b) return '—';
+            return b > 1024*1024 ? `${(b/1024/1024).toFixed(1)} MB` : `${(b/1024).toFixed(0)} KB`;
+        }
+        fmtDur(s) {
+            if (!s) return '—';
+            return `${Math.floor(s/60)}:${Math.floor(s%60).toString().padStart(2,'0')}`;
+        }
+        fmtDate(ts) {
+            if (!ts) return '—';
+            return new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        }
+        esc(t) {
+            const d = document.createElement('div'); d.textContent = t; return d.innerHTML;
+        }
+        showToast(msg, type = 'info') {
+            const c = document.getElementById('toast-container');
+            const t = document.createElement('div');
+            t.className = `toast ${type}`;
+            t.innerHTML = `<span>${this.esc(msg)}</span>`;
+            c.appendChild(t);
+            setTimeout(() => t.parentNode && t.parentNode.removeChild(t), 4000);
+        }
+    }
+    const dash = new StorageDashboard();
     </script>
 </body>
 </html>
