@@ -177,14 +177,28 @@ class AudioPlayer {
 
     /* ── Fullscreen ── */
     toggleFullscreen() {
-        const el = this.videoContainer;
-        if (!el) return;
         const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
         if (!isFs) {
-            const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
-            if (req) req.call(el).catch(() => {});
+            // Always request fullscreen on the container — ensure it's visible first
+            const el = this.videoContainer;
+            if (!el) return;
+            const req = el.requestFullscreen
+                     || el.webkitRequestFullscreen
+                     || el.mozRequestFullScreen
+                     || el.msRequestFullscreen;
+            if (req) {
+                req.call(el).catch(err => {
+                    // Fallback: try the video element directly
+                    const v = this.videoEl;
+                    const vreq = v.requestFullscreen || v.webkitRequestFullscreen || v.mozRequestFullScreen;
+                    if (vreq) vreq.call(v).catch(() => {});
+                });
+            }
         } else {
-            const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+            const exit = document.exitFullscreen
+                      || document.webkitExitFullscreen
+                      || document.mozCancelFullScreen
+                      || document.msExitFullscreen;
             if (exit) exit.call(document).catch(() => {});
         }
     }

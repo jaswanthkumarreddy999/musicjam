@@ -123,6 +123,8 @@
     position: sticky;
     top: calc(62px + 16px);
     box-shadow: var(--shadow-lg);
+    /* Allow fullscreen child to escape */
+    contain: layout style;
 }
 
 .now-playing-content {
@@ -179,8 +181,10 @@
 /* ── Video element in player ── */
 #video-element {
     width: 100%;
-    max-height: 240px; object-fit: contain;
-    /* Do NOT set display:none here — JS controls visibility */
+    display: block;
+    object-fit: contain;
+    background: #000;
+    /* No max-height here — the container aspect-ratio controls the size */
 }
 
 /* Remove height constraint in fullscreen */
