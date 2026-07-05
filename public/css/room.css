@@ -1061,57 +1061,67 @@
     background: #fff; border: 2px solid var(--green); cursor: pointer;
 }
 
-:fullscreen .video-controls-row,
-:-webkit-full-screen .video-controls-row { gap: 12px; }
-:fullscreen .video-song-chip .video-song-name,
-:-webkit-full-screen .video-song-chip .video-song-name { max-width: 360px; font-size: .9rem; }
-:fullscreen .video-vol-wrap:hover .video-vol-slider-wrap,
-:-webkit-full-screen .video-vol-wrap:hover .video-vol-slider-wrap { width: 90px; }
-:fullscreen .video-vol-range,
-:-webkit-full-screen .video-vol-range { width: 90px; }
-
 /* ══════════════════════
    FULLSCREEN  overrides
    ══════════════════════ */
-:fullscreen .video-container,
-:-webkit-full-screen .video-container {
+
+/* The container itself IS the fullscreen element — use :fullscreen on it directly */
+.video-container:fullscreen,
+.video-container:-webkit-full-screen,
+.video-container:-moz-full-screen,
+.video-container:-ms-fullscreen {
     border-radius: 0;
     aspect-ratio: unset;
     width: 100vw !important;
     height: 100vh !important;
-    max-width: none !important;
-    position: fixed; inset: 0;
-    background: #000;
+    max-width: 100vw !important;
+    max-height: 100vh !important;
+    position: fixed !important;
+    inset: 0 !important;
+    background: #000 !important;
+    z-index: 99999 !important;
 }
-:fullscreen .video-container video,
-:-webkit-full-screen .video-container video {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
+
+.video-container:fullscreen video,
+.video-container:-webkit-full-screen video,
+.video-container:-moz-full-screen video,
+.video-container:-ms-fullscreen video {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: contain !important;
 }
+
 /* Bigger controls in fullscreen */
-:fullscreen .video-center-play,
-:-webkit-full-screen .video-center-play {
+.video-container:fullscreen .video-center-play,
+.video-container:-webkit-full-screen .video-center-play {
     width: 80px; height: 80px;
 }
-:fullscreen .video-bottom-bar,
-:-webkit-full-screen .video-bottom-bar {
-    padding: 0 24px 20px;
+.video-container:fullscreen .video-bottom-bar,
+.video-container:-webkit-full-screen .video-bottom-bar {
+    padding: 0 28px 22px;
 }
-:fullscreen .video-progress-track,
-:-webkit-full-screen .video-progress-track { height: 5px; }
-:fullscreen .video-progress-bar:hover .video-progress-track,
-:-webkit-full-screen .video-progress-bar:hover .video-progress-track { height: 8px; }
-:fullscreen .video-title-bar,
-:-webkit-full-screen .video-title-bar { padding: 18px 24px 0; }
-:fullscreen .video-title-text,
-:-webkit-full-screen .video-title-text { font-size: 1rem; }
-:fullscreen .video-time,
-:-webkit-full-screen .video-time { font-size: .85rem; }
-:fullscreen .video-song-name,
-:-webkit-full-screen .video-song-name { font-size: .95rem; }
-:fullscreen .video-ctrl-btn,
-:-webkit-full-screen .video-ctrl-btn { width: 40px; height: 40px; }
+.video-container:fullscreen .video-progress-track,
+.video-container:-webkit-full-screen .video-progress-track { height: 5px; }
+.video-container:fullscreen .video-progress-bar:hover .video-progress-track,
+.video-container:-webkit-full-screen .video-progress-bar:hover .video-progress-track { height: 8px; }
+.video-container:fullscreen .video-title-bar,
+.video-container:-webkit-full-screen .video-title-bar { padding: 20px 28px 0; }
+.video-container:fullscreen .video-title-text,
+.video-container:-webkit-full-screen .video-title-text { font-size: 1.1rem; }
+.video-container:fullscreen .video-time,
+.video-container:-webkit-full-screen .video-time { font-size: .9rem; min-width: 50px; }
+.video-container:fullscreen .video-time-label,
+.video-container:-webkit-full-screen .video-time-label { font-size: .88rem; }
+.video-container:fullscreen .video-song-chip .video-song-name,
+.video-container:-webkit-full-screen .video-song-chip .video-song-name { font-size: .95rem; max-width: 400px; }
+.video-container:fullscreen .video-ctrl-btn,
+.video-container:-webkit-full-screen .video-ctrl-btn { width: 40px; height: 40px; }
+.video-container:fullscreen .video-ctrl-btn svg,
+.video-container:-webkit-full-screen .video-ctrl-btn svg { width: 22px; height: 22px; }
+.video-container:fullscreen .video-vol-wrap:hover .video-vol-slider-wrap,
+.video-container:-webkit-full-screen .video-vol-wrap:hover .video-vol-slider-wrap { width: 100px; }
+.video-container:fullscreen .video-vol-range,
+.video-container:-webkit-full-screen .video-vol-range { width: 100px; }
 
 /* ── Video type pill in queue/library ── */
 .media-type-pill {
