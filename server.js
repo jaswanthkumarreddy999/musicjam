@@ -8,8 +8,17 @@ const compression = require('compression');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs').promises;
-const fsSync = require('fs');
 const musicMetadata = require('music-metadata');
+const cloudinary = require('cloudinary').v2;
+const { Readable } = require('stream');
+
+// ── Cloudinary config ──────────────────────────────────────────
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME || 'lu9erudm',
+  api_key:    process.env.CLOUDINARY_API_KEY    || '643732913946747',
+  api_secret: process.env.CLOUDINARY_API_SECRET || 'WHCHLt3jmNN7iVJ8rmuM_7QZAdg',
+  secure: true
+});
 
 const app = express();
 const server = http.createServer(app);
@@ -22,17 +31,19 @@ const io = socketIo(server, {
 
 const PORT = process.env.PORT || 3000;
 
-// Middleware
+// ── Helmet / CSP — allow Cloudinary media ─────────────────────
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
+      defaultSrc:    ["'self'"],
+      styleSrc:      ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc:       ["'self'", "https://fonts.gstatic.com"],
+      scriptSrc:     ["'self'", "'unsafe-inline'"],
       scriptSrcAttr: ["'unsafe-inline'"],
-      mediaSrc: ["'self'", "blob:", "data:"],
-      connectSrc: ["'self'", "ws:", "wss:", "https://fonts.googleapis.com", "https://fonts.gstatic.com"]
+      mediaSrc:      ["'self'", "blob:", "data:", "https://res.cloudinary.com"],
+      imgSrc:        ["'self'", "data:", "https://res.cloudinary.com"],
+      connectSrc:    ["'self'", "ws:", "wss:", "https://fonts.googleapis.com",
+                      "https://fonts.gstatic.com", "https://api.cloudinary.com"]
     }
   }
 }));
@@ -41,159 +52,64 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
-// Create uploads directory if it doesn't exist
-const createUploadsDir = async () => {
-  try {
-    await fs.mkdir('uploads', { recursive: true });
-    await fs.mkdir('public/uploads', { recursive: true });
-  } catch (error) {
-    console.log('Uploads directory already exists or created');
-  }
-};
-createUploadsDir();
-
-// Storage configuration
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
+// ── Multer — memory storage (file goes straight to Cloudinary) ─
+const AUDIO_EXTS  = /\.(mp3|wav|ogg|m4a|flac|aac|wma)$/i;
+const VIDEO_EXTS  = /\.(mp4|webm|mov|mkv|avi)$/i;
+const AUDIO_MIME  = ['audio/mpeg','audio/wav','audio/wave','audio/x-wav',
+                     'audio/ogg','audio/mp4','audio/x-m4a','audio/flac',
+                     'audio/x-flac','audio/aac','audio/x-ms-wma',
+                     'application/octet-stream'];
+const VIDEO_MIME  = ['video/mp4','video/webm','video/quicktime',
+                     'video/x-matroska','video/x-msvideo'];
 
 const upload = multer({
-  storage: storage,
-  limits: {
-    fileSize: 50 * 1024 * 1024 // 50MB limit
-  },
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 500 * 1024 * 1024 }, // 500 MB
   fileFilter: (req, file, cb) => {
-    console.log('File upload attempt:', {
-      originalname: file.originalname,
-      mimetype: file.mimetype,
-      size: file.size
-    });
-    
-    const allowedExtensions = /\.(mp3|wav|ogg|m4a|flac|aac|wma)$/i;
-    const allowedMimeTypes = [
-      'audio/mpeg',      // mp3
-      'audio/wav',       // wav
-      'audio/wave',      // wav alternative
-      'audio/x-wav',     // wav alternative
-      'audio/ogg',       // ogg
-      'audio/mp4',       // m4a
-      'audio/x-m4a',     // m4a alternative
-      'audio/flac',      // flac
-      'audio/x-flac',    // flac alternative
-      'audio/aac',       // aac
-      'audio/x-ms-wma',  // wma
-      'application/octet-stream' // fallback for some audio files
-    ];
-    
-    const filename = file.originalname.toLowerCase();
-    const extname = allowedExtensions.test(filename);
-    const mimetype = allowedMimeTypes.includes(file.mimetype);
-    
-    console.log('File validation:', {
-      extname: extname,
-      mimetype: mimetype,
-      extension: path.extname(filename),
-      mimeType: file.mimetype,
-      filename: filename
-    });
-    
-    if (extname || mimetype) {
-      console.log('File accepted:', file.originalname);
-      return cb(null, true);
-    } else {
-      console.log('File rejected:', file.originalname, 'Invalid type');
-      cb(new Error(`Invalid file type. Expected audio file, got: ${file.mimetype}`));
-    }
+    const name = file.originalname.toLowerCase();
+    const isAudio = AUDIO_EXTS.test(name) || AUDIO_MIME.includes(file.mimetype);
+    const isVideo = VIDEO_EXTS.test(name) || VIDEO_MIME.includes(file.mimetype);
+    if (isAudio || isVideo) return cb(null, true);
+    cb(new Error(`Unsupported file type: ${file.mimetype}`));
   }
 });
+
+// ── Upload helper: buffer → Cloudinary ────────────────────────
+function uploadToCloudinary(buffer, options) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(options, (err, result) => {
+      if (err) return reject(err);
+      resolve(result);
+    });
+    Readable.from(buffer).pipe(stream);
+  });
+}
 
 // In-memory data storage
 const rooms = new Map();
 const songs = new Map();
 const users = new Map(); // socketId -> { userId, roomCode, nickname, color }
 
-// Persistent storage for songs
-const SONGS_DB_FILE = path.join(__dirname, 'songs-db.json');
+// ── Persistent song metadata (local JSON, survives on paid disk or Railway) ─
+// On Render free tier this is ephemeral; songs stay on Cloudinary permanently.
+const SONGS_DB_FILE = process.env.SONGS_DB_PATH ||
+  path.join(__dirname, 'uploads', 'songs-db.json');
+
+// Ensure the directory for songs-db exists
+fs.mkdir(path.dirname(SONGS_DB_FILE), { recursive: true }).catch(() => {});
 
 // Load songs from persistent storage
 async function loadSongsFromDB() {
   try {
     const data = await fs.readFile(SONGS_DB_FILE, 'utf8');
     const songsData = JSON.parse(data);
-    
-    // Convert array back to Map and validate files still exist
+    // All files are on Cloudinary — no local existence check needed
     for (const song of songsData) {
-      try {
-        // Check if the file still exists
-        await fs.access(song.path.replace('/uploads/', 'uploads/'));
-        songs.set(song.id, song);
-      } catch (fileError) {
-        console.warn(`Song file not found, skipping: ${song.originalName}`);
-      }
+      songs.set(song.id, song);
     }
-    
     console.log(`Loaded ${songs.size} songs from database`);
   } catch (error) {
-    console.log('No existing songs database found, attempting recovery...');
-    await recoverSongsFromFiles();
-  }
-}
-
-// Recover songs from existing files (migration function)
-async function recoverSongsFromFiles() {
-  try {
-    const files = await fs.readdir('uploads');
-    const audioFiles = files.filter(file => 
-      /\.(mp3|wav|ogg|m4a|flac|aac|wma)$/i.test(file) && file !== '.gitkeep'
-    );
-    
-    console.log(`Found ${audioFiles.length} audio files to recover`);
-    
-    for (const filename of audioFiles) {
-      try {
-        const filePath = path.join('uploads', filename);
-        const stats = await fs.stat(filePath);
-        
-        // Extract metadata
-        let metadata = {};
-        try {
-          metadata = await musicMetadata.parseFile(filePath);
-        } catch (metadataError) {
-          console.warn(`Failed to extract metadata for ${filename}`);
-        }
-        
-        const song = {
-          id: uuidv4(),
-          filename: filename,
-          originalName: metadata.common?.title || path.parse(filename).name,
-          title: metadata.common?.title || path.parse(filename).name,
-          artist: metadata.common?.artist || 'Unknown Artist',
-          album: metadata.common?.album || 'Unknown Album',
-          duration: metadata.format?.duration || 0,
-          size: stats.size,
-          uploadedAt: stats.birthtime.getTime(),
-          path: `/uploads/${filename}`
-        };
-        
-        songs.set(song.id, song);
-        console.log(`Recovered: ${song.title}`);
-      } catch (error) {
-        console.warn(`Failed to recover ${filename}:`, error.message);
-      }
-    }
-    
-    if (songs.size > 0) {
-      await saveSongsToDB();
-      console.log(`✅ Recovered ${songs.size} songs and saved to database`);
-    }
-  } catch (error) {
-    console.warn('Failed to recover songs from files:', error.message);
+    console.log('No existing songs database, starting fresh');
   }
 }
 
@@ -540,88 +456,69 @@ app.get('/api/rooms/:code', (req, res) => {
 });
 
 app.post('/api/upload', upload.single('audio'), async (req, res) => {
-  console.log('Upload request received');
-  console.log('Request file:', req.file);
-  console.log('Request body:', req.body);
-  
   try {
     if (!req.file) {
-      console.log('No file in request');
-      return res.status(400).json({
-        success: false,
-        message: 'No audio file provided'
-      });
+      return res.status(400).json({ success: false, message: 'No file provided' });
     }
 
-    console.log('Processing file:', req.file.originalname);
-    
-    // Extract metadata
-    let metadata = {};
-    try {
-      metadata = await musicMetadata.parseFile(req.file.path);
-    } catch (metadataError) {
-      console.warn('Failed to extract metadata, using defaults:', metadataError.message);
-    }
-
-    const incomingName = req.file.originalname.toLowerCase().trim();
-    const incomingNoExt = incomingName.replace(/\.[^.]+$/, '');
+    const name = req.file.originalname.toLowerCase();
+    const isVideo = VIDEO_EXTS.test(name) || VIDEO_MIME.includes(req.file.mimetype);
+    const mediaType = isVideo ? 'video' : 'audio';
 
     // Server-side duplicate check by original filename
+    const incomingNoExt = path.parse(req.file.originalname.toLowerCase().trim()).name;
     for (const existing of songs.values()) {
-      const existingName = (existing.originalName || '').toLowerCase().trim();
-      const existingNoExt = existingName.replace(/\.[^.]+$/, '');
-      if (existingName === incomingName || existingNoExt === incomingNoExt) {
-        // Clean up the uploaded file
-        await fs.unlink(req.file.path).catch(() => {});
+      const existingNoExt = path.parse((existing.originalName || '').toLowerCase().trim()).name;
+      if (existingNoExt === incomingNoExt) {
         return res.status(409).json({
           success: false,
           message: `"${existing.title}" already exists in your library`
         });
       }
     }
-    
+
+    // Upload buffer to Cloudinary
+    const cloudResult = await uploadToCloudinary(req.file.buffer, {
+      resource_type: mediaType,
+      folder: 'musicjam',
+      public_id: `${Date.now()}-${uuidv4().slice(0, 8)}`,
+      use_filename: false,
+    });
+
+    // Extract audio metadata from buffer (audio only)
+    let metadata = {};
+    if (mediaType === 'audio') {
+      try {
+        metadata = await musicMetadata.parseBuffer(req.file.buffer, req.file.mimetype);
+      } catch (e) {
+        console.warn('Metadata extraction failed:', e.message);
+      }
+    }
+
     const song = {
       id: uuidv4(),
-      filename: req.file.filename,
+      cloudinaryId: cloudResult.public_id,
       originalName: req.file.originalname,
       title: metadata.common?.title || path.parse(req.file.originalname).name,
       artist: metadata.common?.artist || 'Unknown Artist',
-      album: metadata.common?.album || 'Unknown Album',
-      duration: metadata.format?.duration || 0,
+      album: metadata.common?.album || '',
+      duration: metadata.format?.duration || cloudResult.duration || 0,
       size: req.file.size,
       uploadedAt: Date.now(),
-      path: `/uploads/${req.file.filename}`
+      url: cloudResult.secure_url,      // permanent Cloudinary URL
+      mediaType,                         // 'audio' | 'video'
+      // keep path for backwards compat
+      path: cloudResult.secure_url,
     };
-    
+
     songs.set(song.id, song);
-
-    // Save to persistent storage
     await saveSongsToDB();
-
-    // Broadcast to all connected sockets that library changed
     io.emit('library-updated', { song });
 
-    res.json({
-      success: true,
-      song: song
-    });
+    res.json({ success: true, song });
   } catch (error) {
     console.error('Upload error:', error);
-    
-    // Clean up file if it was uploaded but processing failed
-    if (req.file) {
-      try {
-        await fs.unlink(req.file.path);
-        console.log('Cleaned up failed upload file');
-      } catch (cleanupError) {
-        console.error('Failed to cleanup file:', cleanupError);
-      }
-    }
-    
-    res.status(500).json({
-      success: false,
-      message: `Failed to process audio file: ${error.message}`
-    });
+    res.status(500).json({ success: false, message: `Upload failed: ${error.message}` });
   }
 });
 
@@ -649,37 +546,26 @@ app.get('/api/library', (req, res) => {
 app.delete('/api/library/:songId', async (req, res) => {
   const { songId } = req.params;
   const song = songs.get(songId);
-  
+
   if (!song) {
-    return res.status(404).json({
-      success: false,
-      message: 'Song not found'
-    });
+    return res.status(404).json({ success: false, message: 'Song not found' });
   }
-  
+
   try {
-    // Delete the file
-    const filePath = path.join(__dirname, 'uploads', song.filename);
-    await fs.unlink(filePath);
-    
-    // Remove from memory
+    // Cloudinary uses resource_type 'video' for both audio and video files
+    if (song.cloudinaryId) {
+      await cloudinary.uploader.destroy(song.cloudinaryId, {
+        resource_type: 'video'
+      }).catch(e => console.warn('Cloudinary delete warning:', e.message));
+    }
+
     songs.delete(songId);
-    
-    // Save updated database
     await saveSongsToDB();
-    
-    console.log('Song deleted:', song.title);
-    
-    res.json({
-      success: true,
-      message: 'Song deleted successfully'
-    });
+
+    res.json({ success: true, message: 'Song deleted successfully' });
   } catch (error) {
     console.error('Failed to delete song:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to delete song file'
-    });
+    res.status(500).json({ success: false, message: 'Failed to delete song' });
   }
 });
 
@@ -745,19 +631,7 @@ app.delete('/api/rooms/:code', (req, res) => {
   });
 });
 
-app.get('/uploads/:filename', (req, res) => {
-  const { filename } = req.params;
-  const filePath = path.join(__dirname, 'uploads', filename);
-  
-  res.sendFile(filePath, (err) => {
-    if (err) {
-      res.status(404).json({
-        success: false,
-        message: 'File not found'
-      });
-    }
-  });
-});
+// Files are served directly from Cloudinary — no local file route needed
 
 // Socket.IO handling with error protection
 io.on('connection', (socket) => {

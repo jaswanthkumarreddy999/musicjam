@@ -156,6 +156,25 @@
     display: flex; flex-direction: column; align-items: center; gap: 20px; width: 100%;
 }
 
+/* ── Media type badge ── */
+.media-badge {
+    display: inline-block;
+    font-size: .7rem; font-weight: 700;
+    padding: 3px 9px; border-radius: var(--r-full);
+    margin-bottom: 8px; letter-spacing: .04em;
+    text-transform: uppercase;
+}
+.media-badge-audio { background: var(--green-dim); color: var(--green); border: 1px solid hsla(152,88%,48%,.25); }
+.media-badge-video { background: hsla(214,90%,60%,.15); color: var(--blue); border: 1px solid hsla(214,90%,60%,.3); }
+
+/* ── Video element in player ── */
+#video-element {
+    width: 100%; border-radius: var(--r-md);
+    background: #000;
+    max-height: 240px; object-fit: contain;
+    display: none;
+}
+
 /* Vinyl disc */
 .artwork-placeholder {
     width: 200px; height: 200px;

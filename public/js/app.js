@@ -276,15 +276,15 @@ class MusicJamApp {
         
         // More permissive file filtering
         const audioFiles = files.filter(file => {
-            const isAudioMime = file.type.startsWith('audio/');
-            const hasAudioExt = /\.(mp3|wav|ogg|m4a|flac|aac|wma)$/i.test(file.name);
-            return isAudioMime || hasAudioExt;
+            const isAudioMime  = file.type.startsWith('audio/');
+            const isVideoMime  = file.type.startsWith('video/');
+            const hasAudioExt  = /\.(mp3|wav|ogg|m4a|flac|aac|wma)$/i.test(file.name);
+            const hasVideoExt  = /\.(mp4|webm|mov|mkv|avi)$/i.test(file.name);
+            return isAudioMime || isVideoMime || hasAudioExt || hasVideoExt;
         });
-        
-        console.log('Audio files found:', audioFiles.length);
-        
+
         if (audioFiles.length === 0) {
-            this.showToast('Please drop audio files only (MP3, WAV, OGG, M4A, FLAC)', 'error');
+            this.showToast('Please drop audio or video files only', 'error');
             return;
         }
         
@@ -313,12 +313,13 @@ class MusicJamApp {
         const toUpload = [];
         for (const file of files) {
             const name = file.name.toLowerCase().trim();
-            // Match on filename without extension OR exact filename
             const noExt = name.replace(/\.[^.]+$/, '');
             if (existingNames.has(name) || existingNames.has(noExt)) {
                 dupes.push(file.name);
             } else {
-                toUpload.push(file);
+                const isMedia = file.type.startsWith('audio/') || file.type.startsWith('video/') ||
+                    /\.(mp3|wav|ogg|m4a|flac|aac|wma|mp4|webm|mov)$/i.test(file.name);
+                if (isMedia) toUpload.push(file);
             }
         }
 

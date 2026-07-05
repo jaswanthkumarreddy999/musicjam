@@ -68,7 +68,9 @@
                             <div class="song-display hidden" id="song-display">
                                 <div class="song-artwork">
                                     <div class="artwork-placeholder" id="song-artwork">🎵</div>
+                                    <!-- Video element renders here when playing video -->
                                     <div class="song-info">
+                                        <span id="media-type-badge" class="media-badge media-badge-audio">♪ Audio</span>
                                         <h2 class="song-title" id="song-title">Song Title</h2>
                                         <p class="song-artist" id="song-artist">Artist Name</p>
                                         <p class="song-album" id="song-album">Album</p>
@@ -78,7 +80,9 @@
                         </div>
 
                         <div class="audio-player" id="audio-player">
-                            <audio id="audio-element" preload="metadata"></audio>
+                        <!-- Audio / Video elements (one shown at a time) -->
+                        <audio id="audio-element" preload="metadata"></audio>
+                        <video id="video-element" preload="metadata" playsinline style="display:none;width:100%;max-height:260px;border-radius:var(--r-md);background:#000;"></video>
 
                             <div class="progress-section">
                                 <span class="time-display" id="current-time">0:00</span>
@@ -161,9 +165,9 @@
                                 <div class="upload-content">
                                     <div class="upload-icon">🎵</div>
                                     <p class="upload-title">Drop files or tap to browse</p>
-                                    <p class="upload-hint">MP3 · WAV · OGG · M4A · FLAC</p>
+                                    <p class="upload-hint">MP3 · WAV · OGG · M4A · FLAC · MP4 · WebM</p>
                                 </div>
-                                <input type="file" id="room-file-input" accept="audio/*" multiple style="display:none;">
+                                <input type="file" id="room-file-input" accept="audio/*,video/mp4,video/webm,video/quicktime" multiple style="display:none;">
                             </div>
                             <div id="room-upload-progress" class="upload-progress hidden">
                                 <div class="progress-bar-track">

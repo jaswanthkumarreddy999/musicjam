@@ -14,6 +14,12 @@ services:
           type: web
           name: musicjam
           property: port
+      - key: CLOUDINARY_CLOUD_NAME
+        value: lu9erudm
+      - key: CLOUDINARY_API_KEY
+        value: "643732913946747"
+      - key: CLOUDINARY_API_SECRET
+        sync: false
     autoDeploy: true
     disk:
       name: musicjam-uploads
