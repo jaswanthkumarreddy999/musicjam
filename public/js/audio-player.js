@@ -49,9 +49,20 @@ class AudioPlayer {
         this.vcPlayIcon        = this.videoCenterPlay?.querySelector('.vc-play-icon');
         this.vcPauseIcon       = this.videoCenterPlay?.querySelector('.vc-pause-icon');
 
+        // New bottom-bar controls
+        this.videoPlayBtn      = document.getElementById('video-play-btn');
+        this.videoFullscreenBtn2 = document.getElementById('video-fullscreen-btn2');
+        this.videoVolBtn       = document.getElementById('video-vol-btn');
+        this.videoVolRange     = document.getElementById('video-vol-range');
+        this.videoCurrentEl2   = document.getElementById('video-current2');
+        this.videoTotalEl2     = document.getElementById('video-total2');
+        this.vcPlayIcon2       = this.videoPlayBtn?.querySelector('.vc-play-icon2');
+        this.vcPauseIcon2      = this.videoPlayBtn?.querySelector('.vc-pause-icon2');
+
         this.audioEl.volume = 0.5;
         this.videoEl.volume = 0.5;
         this.volumeRange.value = 50;
+        if (this.videoVolRange) this.videoVolRange.value = 50;
     }
 
     bindEvents() {
@@ -96,6 +107,39 @@ class AudioPlayer {
             this.videoFullscreenBtn.addEventListener('click', e => {
                 e.stopPropagation();
                 this.toggleFullscreen();
+            });
+        }
+        // Second fullscreen button (bottom bar)
+        if (this.videoFullscreenBtn2) {
+            this.videoFullscreenBtn2.addEventListener('click', e => {
+                e.stopPropagation();
+                this.toggleFullscreen();
+            });
+        }
+        // Play button in bottom bar
+        if (this.videoPlayBtn) {
+            this.videoPlayBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                this.handlePlayPause();
+            });
+        }
+        // Volume slider in bottom bar
+        if (this.videoVolRange) {
+            this.videoVolRange.addEventListener('input', e => {
+                const v = e.target.value / 100;
+                this.audioEl.volume = v;
+                this.videoEl.volume = v;
+                this.volumeRange.value = e.target.value;
+                this.updateVolumeIcon(v);
+                this._updateVideoVolIcon(v);
+            });
+        }
+        if (this.videoVolBtn) {
+            this.videoVolBtn.addEventListener('click', e => {
+                e.stopPropagation();
+                this.toggleMute();
+                if (this.videoVolRange) this.videoVolRange.value = this.media.volume * 100;
+                this._updateVideoVolIcon(this.media.volume);
             });
         }
 
@@ -149,10 +193,24 @@ class AudioPlayer {
 
     _onFullscreenChange() {
         this._isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
-        const enterIcon = this.videoFullscreenBtn?.querySelector('.fs-icon-enter');
-        const exitIcon  = this.videoFullscreenBtn?.querySelector('.fs-icon-exit');
-        if (enterIcon) enterIcon.classList.toggle('hidden', this._isFullscreen);
-        if (exitIcon)  exitIcon.classList.toggle('hidden', !this._isFullscreen);
+        const enterIcon  = this.videoFullscreenBtn?.querySelector('.fs-icon-enter');
+        const exitIcon   = this.videoFullscreenBtn?.querySelector('.fs-icon-exit');
+        const enterIcon2 = this.videoFullscreenBtn2?.querySelector('.fs2-icon-enter');
+        const exitIcon2  = this.videoFullscreenBtn2?.querySelector('.fs2-icon-exit');
+        if (enterIcon)  enterIcon.classList.toggle('hidden', this._isFullscreen);
+        if (exitIcon)   exitIcon.classList.toggle('hidden', !this._isFullscreen);
+        if (enterIcon2) enterIcon2.classList.toggle('hidden', this._isFullscreen);
+        if (exitIcon2)  exitIcon2.classList.toggle('hidden', !this._isFullscreen);
+    }
+
+    _updateVideoVolIcon(v) {
+        const icon = document.getElementById('video-vol-icon');
+        if (!icon) return;
+        if (v === 0) {
+            icon.innerHTML = '<path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>';
+        } else {
+            icon.innerHTML = '<path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>';
+        }
     }
 
     /* ── Media listeners ── */
@@ -160,8 +218,10 @@ class AudioPlayer {
         el.addEventListener('loadedmetadata', () => {
             if (el !== this.media) return;
             this.updateTotalTime();
-            if (this.currentMediaType === 'video' && this.videoTotalEl) {
-                this.videoTotalEl.textContent = this.formatTime(el.duration);
+            if (this.currentMediaType === 'video') {
+                const d = this.formatTime(el.duration);
+                if (this.videoTotalEl)  this.videoTotalEl.textContent  = d;
+                if (this.videoTotalEl2) this.videoTotalEl2.textContent = d;
             }
             // Check after metadata: does the video have actual visual frames?
             if (el === this.videoEl) {
@@ -175,7 +235,9 @@ class AudioPlayer {
             this.updateCurrentTime();
             this.updateProgress();
             if (this.currentMediaType === 'video') {
-                if (this.videoCurrentEl) this.videoCurrentEl.textContent = this.formatTime(el.currentTime);
+                const t = this.formatTime(el.currentTime);
+                if (this.videoCurrentEl)  this.videoCurrentEl.textContent  = t;
+                if (this.videoCurrentEl2) this.videoCurrentEl2.textContent = t;
                 if (this.videoProgressFill && isFinite(el.duration) && el.duration > 0) {
                     this.videoProgressFill.style.width = `${(el.currentTime / el.duration) * 100}%`;
                 }
@@ -392,6 +454,8 @@ class AudioPlayer {
         this.pauseIcon.classList.remove('hidden');
         if (this.vcPlayIcon)  this.vcPlayIcon.classList.add('hidden');
         if (this.vcPauseIcon) this.vcPauseIcon.classList.remove('hidden');
+        if (this.vcPlayIcon2)  this.vcPlayIcon2.classList.add('hidden');
+        if (this.vcPauseIcon2) this.vcPauseIcon2.classList.remove('hidden');
         document.getElementById('song-display')?.classList.add('playing');
         if (this.videoContainer) this.videoContainer.classList.add('is-playing');
         const p = this.media.play();
@@ -415,6 +479,8 @@ class AudioPlayer {
         this.pauseIcon.classList.add('hidden');
         if (this.vcPlayIcon)  this.vcPlayIcon.classList.remove('hidden');
         if (this.vcPauseIcon) this.vcPauseIcon.classList.add('hidden');
+        if (this.vcPlayIcon2)  this.vcPlayIcon2.classList.remove('hidden');
+        if (this.vcPauseIcon2) this.vcPauseIcon2.classList.add('hidden');
         document.getElementById('song-display')?.classList.remove('playing');
         if (this.videoContainer) this.videoContainer.classList.remove('is-playing');
         // Keep overlay visible when paused

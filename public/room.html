@@ -134,9 +134,32 @@
                                                 </div>
                                                 <span class="video-time" id="video-total">0:00</span>
                                             </div>
-                                            <div class="video-song-info">
-                                                <span class="video-song-name" id="video-song-name"></span>
-                                                <span class="video-song-artist-text" id="video-song-artist"></span>
+                                            <div class="video-controls-row">
+                                                <div class="video-controls-left">
+                                                    <button class="video-ctrl-btn" id="video-play-btn" title="Play / Pause">
+                                                        <svg class="vc-play-icon2" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                                                        <svg class="vc-pause-icon2 hidden" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                                                    </button>
+                                                    <span class="video-time-label"><span id="video-current2">0:00</span> / <span id="video-total2">0:00</span></span>
+                                                    <div class="video-vol-wrap">
+                                                        <button class="video-ctrl-btn" id="video-vol-btn" title="Volume">
+                                                            <svg id="video-vol-icon" width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                                                        </button>
+                                                        <div class="video-vol-slider-wrap">
+                                                            <input type="range" id="video-vol-range" min="0" max="100" value="50" class="video-vol-range">
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="video-controls-right">
+                                                    <span class="video-song-chip">
+                                                        <span class="video-song-name" id="video-song-name"></span>
+                                                        <span class="video-song-artist-text" id="video-song-artist"></span>
+                                                    </span>
+                                                    <button class="video-ctrl-btn" id="video-fullscreen-btn2" title="Fullscreen">
+                                                        <svg class="fs2-icon-enter" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                                                        <svg class="fs2-icon-exit hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
