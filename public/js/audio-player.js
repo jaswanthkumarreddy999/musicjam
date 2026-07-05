@@ -162,6 +162,12 @@ class AudioPlayer {
             if (this.currentMediaType === 'video' && this.videoTotalEl) {
                 this.videoTotalEl.textContent = this.formatTime(el.duration);
             }
+            // Check after metadata: does the video have actual visual frames?
+            if (el === this.videoEl) {
+                this._checkVideoTracks();
+                // videoWidth may populate slightly after loadedmetadata — check again
+                setTimeout(() => this._checkVideoTracks(), 300);
+            }
         });
         el.addEventListener('timeupdate', () => {
             if (el !== this.media || this.isSyncing) return;
@@ -209,6 +215,10 @@ class AudioPlayer {
 
         if (mediaType === 'video') {
             this.audioEl.pause();
+            // Reset video element visibility — _checkVideoTracks will adjust after load
+            this.videoEl.style.display = 'block';
+            const fallback = document.getElementById('video-audio-fallback');
+            if (fallback) fallback.style.zIndex = '0';
             // Hide audio vinyl view, show video player
             if (audioDisplay) audioDisplay.classList.add('hidden');
             if (videoDisplay) videoDisplay.classList.remove('hidden');
@@ -227,6 +237,29 @@ class AudioPlayer {
             if (audioPlayerEl) audioPlayerEl.classList.remove('hidden');
             this.media = this.audioEl;
             this.currentMediaType = 'audio';
+        }
+    }
+
+    /* ── Check for actual video track after load ── */
+    _checkVideoTracks() {
+        const video = this.videoEl;
+        const fallback = document.getElementById('video-audio-fallback');
+        const audioPlayerEl = document.getElementById('audio-player');
+        // videoTracks API tells us definitively; fall back to videoWidth check
+        const hasVideoTrack = (video.videoTracks && video.videoTracks.length > 0)
+            || (video.videoWidth > 0);
+
+        if (!hasVideoTrack) {
+            // No visual content — hide the video element, promote fallback
+            video.style.display = 'none';
+            if (fallback) fallback.style.zIndex = '2';
+            // Show the regular audio controls since there's no video UI to use
+            if (audioPlayerEl) audioPlayerEl.classList.remove('hidden');
+        } else {
+            video.style.display = 'block';
+            if (fallback) fallback.style.zIndex = '0';
+            // Hide audio controls — video overlay has its own
+            if (audioPlayerEl) audioPlayerEl.classList.add('hidden');
         }
     }
 
