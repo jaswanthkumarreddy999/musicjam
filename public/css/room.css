@@ -799,7 +799,7 @@
 }
 
 .video-fallback-vinyl {
-    width: 90px; height: 90px;
+    width: 120px; height: 120px;
     background: radial-gradient(circle, #2c2444 0%, #120e20 100%);
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
@@ -809,12 +809,21 @@
     flex-shrink: 0;
 }
 
+.video-fallback-vinyl::before {
+    content: '';
+    position: absolute; inset: 4px; border-radius: 50%;
+    background-image:
+        radial-gradient(circle, transparent 34%, rgba(0,0,0,.3) 39%, transparent 44%),
+        radial-gradient(circle, transparent 54%, rgba(0,0,0,.3) 59%, transparent 64%);
+}
+
 .video-fallback-vinyl::after {
     content: '';
-    position: absolute; width: 24px; height: 24px;
+    position: absolute; width: 30px; height: 30px;
     background: #0d0c1c;
     border: 2px solid hsla(145,90%,48%,.2);
     border-radius: 50%;
+    z-index: 1;
 }
 
 /* Spin when playing */
