@@ -76,7 +76,7 @@ class AudioPlayer {
         this.videoContainer.addEventListener('mousemove',  () => this._showOverlayTemp());
         this.videoContainer.addEventListener('click',      () => this._toggleOverlay());
 
-        // Center play/pause click
+        // Center play/pause click (now outside overlay — always reachable)
         if (this.videoCenterPlay) {
             this.videoCenterPlay.addEventListener('click', e => {
                 e.stopPropagation();
@@ -112,6 +112,7 @@ class AudioPlayer {
     _hideOverlay() {
         if (!this.videoOverlay) return;
         clearTimeout(this._overlayTimer);
+        // Always keep overlay visible when paused
         if (!this.media.paused) this.videoOverlay.classList.remove('visible');
     }
     _showOverlayTemp() {
@@ -124,7 +125,7 @@ class AudioPlayer {
     _toggleOverlay() {
         if (!this.videoOverlay) return;
         const visible = this.videoOverlay.classList.contains('visible');
-        if (visible) this._hideOverlay();
+        if (visible && !this.media.paused) this._hideOverlay();
         else this._showOverlayTemp();
     }
 
@@ -403,6 +404,7 @@ class AudioPlayer {
         });
         // Auto-hide overlay when playing video
         if (this.currentMediaType === 'video') {
+            this._showOverlay();
             setTimeout(() => this._hideOverlay(), 2000);
         }
     }

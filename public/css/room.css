@@ -131,6 +131,12 @@
     min-height: 260px;
 }
 
+/* When video is active, remove padding so video fills the panel */
+.now-playing-content:has(#video-display:not(.hidden)) {
+    padding: 0;
+    min-height: unset;
+}
+
 /* Empty state */
 .no-song {
     text-align: center; padding: 20px;
@@ -172,10 +178,9 @@
 
 /* ── Video element in player ── */
 #video-element {
-    width: 100%; border-radius: var(--r-md);
-    background: #000;
+    width: 100%;
     max-height: 240px; object-fit: contain;
-    display: none;
+    /* Do NOT set display:none here — JS controls visibility */
 }
 
 /* Vinyl disc */
@@ -858,8 +863,13 @@
         transparent 65%,
         rgba(0,0,0,.7) 100%
     );
+    z-index: 3;
+    pointer-events: none;
 }
-.video-overlay.visible { opacity: 1; }
+.video-overlay.visible {
+    opacity: 1;
+    pointer-events: all;
+}
 
 /* Top bar — title + fullscreen */
 .video-title-bar {
@@ -884,7 +894,7 @@
 }
 .video-ctrl-btn:hover { background: rgba(255,255,255,.2); }
 
-/* Center play/pause tap area */
+/* Center play/pause tap area — sits outside overlay, always interactive */
 .video-center-play {
     position: absolute; top: 50%; left: 50%;
     transform: translate(-50%, -50%);
@@ -893,11 +903,24 @@
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     color: #fff;
-    transition: transform var(--fast), background var(--fast);
+    transition: transform var(--fast), background var(--fast), opacity .2s ease;
     pointer-events: all;
+    z-index: 4;
+    opacity: 1;
 }
 .video-center-play:hover { background: rgba(0,0,0,.7); transform: translate(-50%, -50%) scale(1.08); }
 .video-center-play:active { transform: translate(-50%, -50%) scale(.95); }
+
+/* Hide center button while playing (show on hover via overlay) */
+.video-container.is-playing .video-center-play {
+    opacity: 0;
+    pointer-events: none;
+}
+.video-container.is-playing:hover .video-center-play,
+.video-container.is-playing:focus-within .video-center-play {
+    opacity: 1;
+    pointer-events: all;
+}
 
 /* Bottom bar */
 .video-bottom-bar {
