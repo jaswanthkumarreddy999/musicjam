@@ -50,14 +50,14 @@ class AudioPlayer {
         this.vcPauseIcon       = this.videoCenterPlay?.querySelector('.vc-pause-icon');
 
         // New bottom-bar controls
-        this.videoPlayBtn      = document.getElementById('video-play-btn');
-        this.videoFullscreenBtn2 = document.getElementById('video-fullscreen-btn2');
-        this.videoVolBtn       = document.getElementById('video-vol-btn');
-        this.videoVolRange     = document.getElementById('video-vol-range');
-        this.videoCurrentEl2   = document.getElementById('video-current2');
-        this.videoTotalEl2     = document.getElementById('video-total2');
-        this.vcPlayIcon2       = this.videoPlayBtn?.querySelector('.vc-play-icon2');
-        this.vcPauseIcon2      = this.videoPlayBtn?.querySelector('.vc-pause-icon2');
+        this.videoPlayBtn        = document.getElementById('video-play-btn');
+        this.videoFullscreenBtn2 = null; // removed — single fullscreen btn now
+        this.videoVolBtn         = document.getElementById('video-vol-btn');
+        this.videoVolRange       = document.getElementById('video-vol-range');
+        this.videoCurrentEl2     = document.getElementById('video-current2');
+        this.videoTotalEl2       = document.getElementById('video-total2');
+        this.vcPlayIcon2         = this.videoPlayBtn?.querySelector('.vc-play-icon2');
+        this.vcPauseIcon2        = this.videoPlayBtn?.querySelector('.vc-pause-icon2');
 
         this.audioEl.volume = 0.5;
         this.videoEl.volume = 0.5;
@@ -102,16 +102,9 @@ class AudioPlayer {
             this.videoProgressBar.addEventListener('touchstart',e => this.startDrag(e, true), { passive: false });
         }
 
-        // Fullscreen
+        // Single fullscreen button (bottom-right of controls bar)
         if (this.videoFullscreenBtn) {
             this.videoFullscreenBtn.addEventListener('click', e => {
-                e.stopPropagation();
-                this.toggleFullscreen();
-            });
-        }
-        // Second fullscreen button (bottom bar)
-        if (this.videoFullscreenBtn2) {
-            this.videoFullscreenBtn2.addEventListener('click', e => {
                 e.stopPropagation();
                 this.toggleFullscreen();
             });
@@ -184,23 +177,22 @@ class AudioPlayer {
     toggleFullscreen() {
         const el = this.videoContainer;
         if (!el) return;
-        if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-            (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+        const isFs = !!(document.fullscreenElement || document.webkitFullscreenElement);
+        if (!isFs) {
+            const req = el.requestFullscreen || el.webkitRequestFullscreen || el.mozRequestFullScreen || el.msRequestFullscreen;
+            if (req) req.call(el).catch(() => {});
         } else {
-            (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+            const exit = document.exitFullscreen || document.webkitExitFullscreen || document.mozCancelFullScreen || document.msExitFullscreen;
+            if (exit) exit.call(document).catch(() => {});
         }
     }
 
     _onFullscreenChange() {
         this._isFullscreen = !!(document.fullscreenElement || document.webkitFullscreenElement);
-        const enterIcon  = this.videoFullscreenBtn?.querySelector('.fs-icon-enter');
-        const exitIcon   = this.videoFullscreenBtn?.querySelector('.fs-icon-exit');
-        const enterIcon2 = this.videoFullscreenBtn2?.querySelector('.fs2-icon-enter');
-        const exitIcon2  = this.videoFullscreenBtn2?.querySelector('.fs2-icon-exit');
-        if (enterIcon)  enterIcon.classList.toggle('hidden', this._isFullscreen);
-        if (exitIcon)   exitIcon.classList.toggle('hidden', !this._isFullscreen);
-        if (enterIcon2) enterIcon2.classList.toggle('hidden', this._isFullscreen);
-        if (exitIcon2)  exitIcon2.classList.toggle('hidden', !this._isFullscreen);
+        const enterIcon = this.videoFullscreenBtn?.querySelector('.fs-icon-enter');
+        const exitIcon  = this.videoFullscreenBtn?.querySelector('.fs-icon-exit');
+        if (enterIcon) enterIcon.classList.toggle('hidden', this._isFullscreen);
+        if (exitIcon)  exitIcon.classList.toggle('hidden', !this._isFullscreen);
     }
 
     _updateVideoVolIcon(v) {
@@ -225,9 +217,7 @@ class AudioPlayer {
             }
             // Check after metadata: does the video have actual visual frames?
             if (el === this.videoEl) {
-                this._checkVideoTracks();
-                // videoWidth may populate slightly after loadedmetadata — check again
-                setTimeout(() => this._checkVideoTracks(), 300);
+                this._scheduleVideoCheck();
             }
         });
         el.addEventListener('timeupdate', () => {
@@ -278,8 +268,9 @@ class AudioPlayer {
 
         if (mediaType === 'video') {
             this.audioEl.pause();
-            // Reset video element visibility — _checkVideoTracks will adjust after load
-            this.videoEl.style.display = 'block';
+            // Reset video element — _scheduleVideoCheck will adjust after load
+            this.videoEl.style.opacity = '1';
+            this.videoEl.style.pointerEvents = 'auto';
             const fallback = document.getElementById('video-audio-fallback');
             if (fallback) fallback.style.zIndex = '0';
             // Hide audio vinyl view, show video player
@@ -308,22 +299,30 @@ class AudioPlayer {
         const video = this.videoEl;
         const fallback = document.getElementById('video-audio-fallback');
         const audioPlayerEl = document.getElementById('audio-player');
-        // videoTracks API tells us definitively; fall back to videoWidth check
-        const hasVideoTrack = (video.videoTracks && video.videoTracks.length > 0)
-            || (video.videoWidth > 0);
 
-        if (!hasVideoTrack) {
-            // No visual content — hide the video element, promote fallback
-            video.style.display = 'none';
-            if (fallback) fallback.style.zIndex = '2';
-            // Show the regular audio controls since there's no video UI to use
+        // videoWidth > 0 means real video frames exist
+        // videoTracks API is more reliable but not supported everywhere
+        const hasVideo = (video.videoWidth > 0)
+            || (typeof video.videoTracks !== 'undefined' && video.videoTracks.length > 0);
+
+        if (!hasVideo) {
+            video.style.opacity = '0';
+            video.style.pointerEvents = 'none';
+            if (fallback) { fallback.style.zIndex = '2'; fallback.style.display = 'flex'; }
             if (audioPlayerEl) audioPlayerEl.classList.remove('hidden');
         } else {
-            video.style.display = 'block';
-            if (fallback) fallback.style.zIndex = '0';
-            // Hide audio controls — video overlay has its own
+            video.style.opacity = '1';
+            video.style.pointerEvents = 'auto';
+            if (fallback) { fallback.style.zIndex = '0'; }
             if (audioPlayerEl) audioPlayerEl.classList.add('hidden');
         }
+    }
+
+    /* Schedule multiple checks — videoWidth populates at different times per browser */
+    _scheduleVideoCheck() {
+        [100, 500, 1000, 2000].forEach(ms => setTimeout(() => {
+            if (this.currentMediaType === 'video') this._checkVideoTracks();
+        }, ms));
     }
 
     /* ── Controls ── */
