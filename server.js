@@ -479,8 +479,11 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
     }
 
     // Upload buffer to Cloudinary
+    // Cloudinary resource_type: 'video' handles both audio and video files
+    // 'raw' would work too but 'video' gives duration metadata
+    const cloudinaryResourceType = isVideo ? 'video' : 'video';
     const cloudResult = await uploadToCloudinary(req.file.buffer, {
-      resource_type: mediaType,
+      resource_type: cloudinaryResourceType,
       folder: 'musicjam',
       public_id: `${Date.now()}-${uuidv4().slice(0, 8)}`,
       use_filename: false,
