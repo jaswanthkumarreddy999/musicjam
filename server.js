@@ -20,6 +20,8 @@ cloudinary.config({
   secure: true
 });
 
+console.log('☁️  Cloudinary cloud:', process.env.CLOUDINARY_CLOUD_NAME || 'lu9erudm (fallback)');
+
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
@@ -90,13 +92,12 @@ const rooms = new Map();
 const songs = new Map();
 const users = new Map(); // socketId -> { userId, roomCode, nickname, color }
 
-// ── Persistent song metadata (local JSON, survives on paid disk or Railway) ─
-// On Render free tier this is ephemeral; songs stay on Cloudinary permanently.
+// ── Persistent song metadata ─────────────────────────────────
+// Uses /tmp on ephemeral hosts — songs stay on Cloudinary permanently regardless
 const SONGS_DB_FILE = process.env.SONGS_DB_PATH ||
-  path.join(__dirname, 'uploads', 'songs-db.json');
+  path.join(require('os').tmpdir(), 'musicjam-songs-db.json');
 
-// Ensure the directory for songs-db exists
-fs.mkdir(path.dirname(SONGS_DB_FILE), { recursive: true }).catch(() => {});
+console.log('Songs DB path:', SONGS_DB_FILE);
 
 // Load songs from persistent storage
 async function loadSongsFromDB() {
