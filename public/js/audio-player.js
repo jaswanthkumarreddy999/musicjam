@@ -345,6 +345,9 @@ class AudioPlayer {
         if (document.getElementById('video-title-text'))  document.getElementById('video-title-text').textContent  = song.title;
         if (document.getElementById('video-song-name'))   document.getElementById('video-song-name').textContent   = song.title;
         if (document.getElementById('video-song-artist')) document.getElementById('video-song-artist').textContent = song.artist;
+        // Fallback vinyl info (shown when video has no visual track)
+        if (document.getElementById('video-fallback-title'))  document.getElementById('video-fallback-title').textContent  = song.title;
+        if (document.getElementById('video-fallback-artist')) document.getElementById('video-fallback-artist').textContent = song.artist;
 
         document.getElementById('no-song-display').classList.add('hidden');
     }
@@ -356,6 +359,7 @@ class AudioPlayer {
         if (this.vcPlayIcon)  this.vcPlayIcon.classList.add('hidden');
         if (this.vcPauseIcon) this.vcPauseIcon.classList.remove('hidden');
         document.getElementById('song-display')?.classList.add('playing');
+        if (this.videoContainer) this.videoContainer.classList.add('is-playing');
         const p = this.media.play();
         if (p) p.catch(err => {
             this.socketManager.showToast('Tap to play', 'info');
@@ -377,6 +381,7 @@ class AudioPlayer {
         if (this.vcPlayIcon)  this.vcPlayIcon.classList.remove('hidden');
         if (this.vcPauseIcon) this.vcPauseIcon.classList.add('hidden');
         document.getElementById('song-display')?.classList.remove('playing');
+        if (this.videoContainer) this.videoContainer.classList.remove('is-playing');
         // Keep overlay visible when paused
         if (this.currentMediaType === 'video') this._showOverlay();
     }
@@ -430,6 +435,7 @@ class AudioPlayer {
         if (videoDisplay)  videoDisplay.classList.add('hidden');
         if (audioPlayerEl) audioPlayerEl.classList.remove('hidden');
         if (songDisplay)   { songDisplay.classList.remove('playing'); songDisplay.classList.add('hidden'); }
+        if (this.videoContainer) this.videoContainer.classList.remove('is-playing');
         document.getElementById('no-song-display')?.classList.remove('hidden');
         this.media = this.audioEl;
         this.currentMediaType = 'audio';
