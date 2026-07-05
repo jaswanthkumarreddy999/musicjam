@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MusicJam - Listen Together</title>
-    <link rel="stylesheet" href="/css/style.css?v=2.0">
+    <title>MusicJam — Listen Together</title>
+    <link rel="stylesheet" href="/css/style.css?v=3.0">
     <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#1db954">
+    <meta name="theme-color" content="#00f59b">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <link rel="icon" type="image/png" href="/icons/favicon.png">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -17,125 +17,165 @@
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
 </head>
 <body>
-    <!-- Loading Screen -->
     <div id="loading-screen" class="loading-screen">
         <div class="loading-content">
-            <div class="logo">
-                <div class="music-note">🎵</div>
-                <h1>MusicJam</h1>
+            <div class="loading-logo">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 18V5l12-2v13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    <circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="2"/>
+                    <circle cx="18" cy="16" r="3" stroke="currentColor" stroke-width="2"/>
+                </svg>
+                <span>MusicJam</span>
             </div>
             <div class="loading-spinner"></div>
         </div>
     </div>
 
-    <!-- Main App -->
     <div id="app" class="app hidden">
 
-        <!-- Header -->
         <header class="header">
             <div class="container">
                 <div class="header-content">
                     <div class="logo">
-                        <span class="logo-icon">🎵</span>
-                        <h1 class="logo-text">MusicJam</h1>
+                        <svg class="logo-icon" width="22" height="22" viewBox="0 0 24 24" fill="none">
+                            <path d="M9 18V5l12-2v13" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+                            <circle cx="6" cy="18" r="3" stroke="currentColor" stroke-width="2.2"/>
+                            <circle cx="18" cy="16" r="3" stroke="currentColor" stroke-width="2.2"/>
+                        </svg>
+                        <span class="logo-text">MusicJam</span>
                     </div>
                     <div class="header-actions">
-                        <a href="/dashboard.html" class="btn btn-outline btn-small">
-                            📊 Dashboard
-                        </a>
-                        <button id="install-btn" class="btn btn-outline btn-small hidden">
-                            📱 Install
-                        </button>
+                        <a href="/dashboard.html" class="btn btn-ghost btn-small">Dashboard</a>
+                        <button id="install-btn" class="btn btn-outline btn-small hidden">Install App</button>
                     </div>
                 </div>
             </div>
         </header>
 
-        <!-- Hero: Create / Join -->
+        <!-- Hero -->
         <section class="hero">
             <div class="container">
-                <div class="hero-content">
-                    <h2 class="hero-title">Listen Together</h2>
-                    <p class="hero-subtitle">Create a room, share the code, jam in sync.</p>
-
-                    <div class="hero-actions">
+                <div class="hero-inner">
+                    <div class="hero-text">
+                        <h1 class="hero-title">Listen together,<br>in perfect sync.</h1>
+                        <p class="hero-subtitle">Upload your music, create a room, share the code. Everyone hears the same song at the same moment.</p>
+                    </div>
+                    <div class="hero-cta">
                         <button id="create-room-btn" class="btn btn-primary btn-large">
-                            <span class="btn-icon">🎵</span>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                                <path d="M12 5v14M5 12h14"/>
+                            </svg>
                             Create Room
                         </button>
-                        <div class="join-room-section">
+                        <div class="divider-or"><span>or join one</span></div>
+                        <div class="join-row">
                             <input type="text"
                                    id="room-code-input"
-                                   placeholder="Room code"
+                                   placeholder="6-digit code"
                                    maxlength="6"
                                    inputmode="numeric"
                                    class="room-code-input">
-                            <button id="join-room-btn" class="btn btn-secondary">
-                                Join
+                            <button id="join-room-btn" class="btn btn-secondary">Join</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Main content grid -->
+        <div class="main-grid">
+            <div class="container">
+                <div class="content-columns">
+
+                    <!-- Left: Active Rooms -->
+                    <section class="content-col" id="active-rooms-section">
+                        <div class="col-header">
+                            <h2 class="col-title">Active Rooms</h2>
+                            <button id="refresh-rooms-btn" class="btn btn-ghost btn-small icon-btn" title="Refresh">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                    <path d="M3 3v5h5"/>
+                                </svg>
+                                Refresh
                             </button>
                         </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Active Rooms -->
-        <section class="home-section" id="active-rooms-section">
-            <div class="container">
-                <div class="section-header">
-                    <h3 class="section-heading">Active Rooms</h3>
-                    <button id="refresh-rooms-btn" class="btn btn-ghost btn-small">🔄 Refresh</button>
-                </div>
-                <div id="rooms-list" class="rooms-list"></div>
-                <div id="no-rooms" class="empty-state hidden">
-                    <div class="empty-icon">🎧</div>
-                    <p>No active rooms yet</p>
-                    <p class="empty-sub">Create one to start listening with friends</p>
-                </div>
-            </div>
-        </section>
-
-        <!-- Music Library -->
-        <section class="home-section" id="music-library-home">
-            <div class="container">
-                <div class="section-header">
-                    <h3 class="section-heading">Your Library</h3>
-                    <div class="section-header-actions">
-                        <button id="refresh-library-btn" class="btn btn-ghost btn-small">🔄</button>
-                        <button id="clear-library-btn" class="btn btn-ghost btn-small danger-text">🗑️ Clear All</button>
-                        <button id="upload-btn" class="btn btn-primary btn-small">
-                            <span>➕</span> Upload
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Upload Panel -->
-                <div class="upload-panel hidden" id="upload-section">
-                    <div class="upload-area" id="upload-area">
-                        <div class="upload-content">
-                            <div class="upload-icon">🎵</div>
-                            <p class="upload-title">Drop audio files here</p>
-                            <p class="upload-hint">or tap to browse — MP3, WAV, OGG, M4A, FLAC</p>
+                        <div id="rooms-list" class="rooms-list"></div>
+                        <div id="no-rooms" class="empty-state hidden">
+                            <div class="empty-icon-wrap">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                                    <polyline points="9,22 9,12 15,12 15,22"/>
+                                </svg>
+                            </div>
+                            <p class="empty-title">No active rooms</p>
+                            <p class="empty-sub">Create one to start listening with friends</p>
                         </div>
-                        <input type="file" id="file-input" accept="audio/*" multiple style="display:none;">
-                    </div>
-                    <div class="upload-progress hidden" id="upload-progress">
-                        <div class="progress-bar-track">
-                            <div class="progress-fill" id="progress-fill"></div>
-                        </div>
-                        <p class="progress-text" id="progress-text">Uploading…</p>
-                    </div>
-                </div>
+                    </section>
 
-                <!-- Songs List -->
-                <div id="library-list" class="library-list"></div>
-                <div id="no-library" class="empty-state hidden">
-                    <div class="empty-icon">🎵</div>
-                    <p>No music uploaded yet</p>
-                    <p class="empty-sub">Upload audio files to build your library</p>
+                    <!-- Right: Library -->
+                    <section class="content-col" id="music-library-home">
+                        <div class="col-header">
+                            <h2 class="col-title">Your Library</h2>
+                            <div class="col-header-actions">
+                                <button id="refresh-library-btn" class="btn btn-ghost btn-small icon-btn" title="Refresh">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                                        <path d="M3 3v5h5"/>
+                                    </svg>
+                                </button>
+                                <button id="clear-library-btn" class="btn btn-ghost btn-small danger-text">Clear all</button>
+                                <button id="upload-btn" class="btn btn-primary btn-small">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                        <polyline points="17,8 12,3 7,8"/>
+                                        <line x1="12" y1="3" x2="12" y2="15"/>
+                                    </svg>
+                                    Upload
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Upload Panel -->
+                        <div class="upload-panel hidden" id="upload-section">
+                            <div class="upload-area" id="upload-area">
+                                <div class="upload-content">
+                                    <div class="upload-icon-wrap">
+                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                            <polyline points="17,8 12,3 7,8"/>
+                                            <line x1="12" y1="3" x2="12" y2="15"/>
+                                        </svg>
+                                    </div>
+                                    <p class="upload-title">Drop audio files here</p>
+                                    <p class="upload-hint">MP3 · WAV · OGG · M4A · FLAC — max 50 MB each</p>
+                                </div>
+                                <input type="file" id="file-input" accept="audio/*" multiple style="display:none;">
+                            </div>
+                            <div class="upload-progress hidden" id="upload-progress">
+                                <div class="progress-bar-track">
+                                    <div class="progress-fill" id="progress-fill"></div>
+                                </div>
+                                <p class="progress-text" id="progress-text">Uploading…</p>
+                            </div>
+                        </div>
+
+                        <div id="library-list" class="library-list"></div>
+                        <div id="no-library" class="empty-state hidden">
+                            <div class="empty-icon-wrap">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+                                    <path d="M9 18V5l12-2v13"/>
+                                    <circle cx="6" cy="18" r="3"/>
+                                    <circle cx="18" cy="16" r="3"/>
+                                </svg>
+                            </div>
+                            <p class="empty-title">No music yet</p>
+                            <p class="empty-sub">Upload audio files to build your library</p>
+                        </div>
+                    </section>
+
                 </div>
             </div>
-        </section>
+        </div>
 
         <footer class="footer">
             <div class="container">
@@ -148,12 +188,14 @@
     <div id="modal-overlay" class="modal-overlay hidden">
         <div class="modal" id="room-created-modal">
             <div class="modal-header">
-                <h3>Room Created 🎉</h3>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
+                <h3>Room created</h3>
+                <button class="modal-close" onclick="closeModal()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                </button>
             </div>
             <div class="modal-content">
                 <div class="room-code-display">
-                    <label>Share this code with friends</label>
+                    <label>Share this code</label>
                     <div class="code-box">
                         <span id="created-room-code">123456</span>
                         <button id="copy-code-btn" class="btn btn-small btn-outline">Copy</button>
@@ -167,7 +209,6 @@
         </div>
     </div>
 
-    <!-- Toast Notifications -->
     <div id="toast-container" class="toast-container"></div>
 
     <script src="/socket.io/socket.io.js"></script>

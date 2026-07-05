@@ -524,30 +524,28 @@ class MusicJamApp {
         roomsList.innerHTML = rooms.map(room => `
             <div class="room-card">
                 <div class="room-card-header">
-                    <span class="room-code">Room ${room.code}</span>
+                    <span class="room-code">${room.code}</span>
                     <div class="room-status">
                         <span class="status-indicator"></span>
-                        <span>Active</span>
+                        Active
                     </div>
                 </div>
-                <div class="room-info">
-                    <div class="room-users">
-                        👥 ${room.userCount} listener${room.userCount !== 1 ? 's' : ''}
-                    </div>
+                <div class="room-meta">
+                    <div class="room-users">${room.userCount} listener${room.userCount !== 1 ? 's' : ''}</div>
                     <div class="room-song">
-                        ${room.currentSong ? 
-                            `🎵 ${room.isPlaying ? 'Playing' : 'Paused'}: ${this.escapeHtml(room.currentSong.title)}` :
-                            `📋 Queue: ${room.queueLength} song${room.queueLength !== 1 ? 's' : ''}`
+                        ${room.currentSong ?
+                            `${room.isPlaying ? '▶' : '⏸'} ${this.escapeHtml(room.currentSong.title)}` :
+                            `${room.queueLength} song${room.queueLength !== 1 ? 's' : ''} in queue`
                         }
                     </div>
                 </div>
                 <div class="room-actions">
                     <button class="btn btn-primary btn-small join-room-btn" data-room-code="${room.code}">
-                        🚪 Join
+                        Join
                     </button>
                     ${room.isHost ? `
-                        <button class="btn btn-outline btn-small delete-room-btn" data-room-code="${room.code}">
-                            🗑️ Delete
+                        <button class="btn btn-ghost btn-small delete-room-btn" data-room-code="${room.code}" style="border-color:hsla(4,80%,60%,.25);color:var(--red)">
+                            Delete
                         </button>
                     ` : ''}
                 </div>
@@ -659,7 +657,9 @@ class MusicJamApp {
                     <input type="checkbox" class="song-checkbox" data-song-id="${song.id}" data-filename="${this.escapeHtml(song.filename)}" data-title="${this.escapeHtml(song.title)}">
                     <span class="checkbox-custom"></span>
                 </label>
-                <div class="library-song-icon">🎵</div>
+                <div class="library-song-icon">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+                </div>
                 <div class="library-song-info">
                     <div class="library-song-title">${this.escapeHtml(song.title)}</div>
                     <div class="library-song-meta">
@@ -669,10 +669,10 @@ class MusicJamApp {
                 </div>
                 <div class="song-card-actions">
                     <button class="btn-icon-action download-song-btn" data-filename="${this.escapeHtml(song.filename)}" data-title="${this.escapeHtml(song.title)}" title="Download">
-                        ⬇️
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
                     </button>
-                    <button class="btn-delete delete-song-btn" data-song-id="${song.id}" aria-label="Delete ${this.escapeHtml(song.title)}">
-                        🗑️
+                    <button class="btn-delete delete-song-btn" data-song-id="${song.id}" aria-label="Delete ${this.escapeHtml(song.title)}" title="Delete">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                     </button>
                 </div>
             </div>
@@ -696,8 +696,8 @@ class MusicJamApp {
                 </label>
                 <span class="bulk-selected-count" id="bulk-selected-count"></span>
                 <div class="bulk-btns">
-                    <button id="download-selected-btn" class="btn btn-outline btn-small" disabled>⬇️ Download selected</button>
-                    <button id="download-all-btn" class="btn btn-ghost btn-small">⬇️ Download all</button>
+                    <button id="download-selected-btn" class="btn btn-outline btn-small" disabled>Download selected</button>
+                    <button id="download-all-btn" class="btn btn-ghost btn-small">Download all</button>
                 </div>
             `;
             // Insert before library-list
