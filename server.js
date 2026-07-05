@@ -50,7 +50,8 @@ app.use(helmet({
 }));
 app.use(compression());
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '1000mb' }));
+app.use(express.urlencoded({ limit: '1000mb', extended: true }));
 app.use(express.static('public'));
 
 // ── Multer — disk storage (prevents OOM on 512MB instances) ──
@@ -64,7 +65,11 @@ const VIDEO_MIME  = ['video/mp4','video/webm','video/quicktime',
                      'video/x-matroska','video/x-msvideo'];
 
 const uploadDir = path.join(__dirname, 'uploads');
-fs.mkdir(uploadDir, { recursive: true }).catch(console.error);
+try {
+  require('fs').mkdirSync(uploadDir, { recursive: true });
+} catch (e) {
+  // Ignore if exists
+}
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, uploadDir),
@@ -481,12 +486,13 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
       }
     }
 
-    // Upload direct from disk to Cloudinary — resource_type 'video' handles both audio and video efficiently
-    const cloudResult = await cloudinary.uploader.upload(uploadedFilePath, {
+    // Upload direct from disk to Cloudinary using upload_large (handles chunking for files >100MB!)
+    const cloudResult = await cloudinary.uploader.upload_large(uploadedFilePath, {
       resource_type: 'video',
       folder: 'musicjam',
       public_id: `${Date.now()}-${uuidv4().slice(0, 8)}`,
       use_filename: false,
+      chunk_size: 20000000 // 20MB chunks
     });
 
     // Extract audio metadata directly from the file (audio only)
