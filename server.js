@@ -532,8 +532,8 @@ app.get('/api/library', (req, res) => {
   
   // Calculate total storage used
   const totalSize = library.reduce((sum, song) => sum + (song.size || 0), 0);
-  const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
-  const percentUsed = ((totalSize / (1024 * 1024 * 1024)) * 100).toFixed(1);
+  const totalSizeMB   = (totalSize / (1024 * 1024)).toFixed(2);
+  const percentUsed   = ((totalSize / (25 * 1024 * 1024 * 1024)) * 100).toFixed(2);
   
   res.json({
     success: true,
@@ -542,8 +542,8 @@ app.get('/api/library', (req, res) => {
       songCount: library.length,
       totalSizeMB: parseFloat(totalSizeMB),
       percentUsed: parseFloat(percentUsed),
-      availableMB: parseFloat((1000 - parseFloat(totalSizeMB)).toFixed(2)),
-      limitMB: 1000
+      availableMB: parseFloat((25000 - parseFloat(totalSizeMB)).toFixed(2)),
+      limitMB: 25000
     }
   });
 });

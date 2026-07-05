@@ -27,8 +27,8 @@ async function checkStorageUsage() {
         console.log(`📊 Storage Usage Report:`);
         console.log(`🎵 Songs: ${songCount}`);
         console.log(`💾 Used: ${totalSizeMB} MB (${totalSizeGB} GB)`);
-        console.log(`📈 Capacity: ${percentUsed}% of 1GB`);
-        console.log(`🆓 Available: ${(1000 - parseFloat(totalSizeMB)).toFixed(2)} MB`);
+        console.log(`📈 Capacity: ${percentUsed}% of 25GB`);
+        console.log(`🆓 Available: ${(25000 - parseFloat(totalSizeMB)).toFixed(2)} MB`);
         
         if (parseFloat(percentUsed) > 80) {
             console.log(`⚠️  Warning: Storage is ${percentUsed}% full!`);
@@ -38,7 +38,7 @@ async function checkStorageUsage() {
             songCount,
             totalSizeMB: parseFloat(totalSizeMB),
             percentUsed: parseFloat(percentUsed),
-            availableMB: 1000 - parseFloat(totalSizeMB)
+            availableMB: 25000 - parseFloat(totalSizeMB)
         };
         
     } catch (error) {
