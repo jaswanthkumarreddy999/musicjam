@@ -13,6 +13,15 @@ const musicMetadata = require('music-metadata');
 const cloudinary = require('cloudinary').v2;
 const { Readable } = require('stream');
 const ffmpeg = require('fluent-ffmpeg');
+try {
+  const ffmpegPath = require('ffmpeg-static');
+  const ffprobePath = require('ffprobe-static');
+  ffmpeg.setFfmpegPath(ffmpegPath);
+  ffmpeg.setFfprobePath(ffprobePath);
+  console.log('✓ Loaded static ffmpeg/ffprobe binaries');
+} catch (e) {
+  console.log('⚠️ Static ffmpeg/ffprobe binaries not found. Using system fallback path.');
+}
 const os = require('os');
 
 // ── Cloudinary config ──────────────────────────────────────────
@@ -97,6 +106,7 @@ const upload = multer({
 const rooms = new Map();
 const songs = new Map();
 const users = new Map(); // socketId -> { userId, roomCode, nickname, color }
+const transcodeJobs = new Map(); // jobId -> { status: 'transcoding' | 'uploading' | 'completed' | 'failed', progress: 0, song: null, error: null }
 
 // ── Persistent song metadata — backed by Cloudinary raw asset ──
 const SONGS_DB_PUBLIC_ID = 'musicjam/songs-db';
@@ -473,6 +483,7 @@ function transcodeToHLS(inputPath, jobId) {
     fsSync.mkdirSync(hlsDir, { recursive: true });
     const manifestPath = path.join(hlsDir, 'index.m3u8');
     const segmentPattern = path.join(hlsDir, 'seg%04d.ts');
+    let lastLoggedPercent = -10;
 
     ffmpeg(inputPath)
       .outputOptions([
@@ -491,17 +502,27 @@ function transcodeToHLS(inputPath, jobId) {
       .output(manifestPath)
       .on('start', cmd => console.log('🎬 FFmpeg HLS cmd:', cmd.slice(0, 120) + '…'))
       .on('progress', p => {
-        if (p.percent) process.stdout.write(`\r  HLS progress: ${Math.round(p.percent)}%  `);
+        if (p.percent) {
+          const percent = Math.round(p.percent);
+          const job = transcodeJobs.get(jobId);
+          if (job) job.progress = percent;
+          
+          // Throttled logging (every 20%) to prevent clogging Render log drains
+          if (percent >= lastLoggedPercent + 20 || percent >= 100) {
+            console.log(`🎬 [Job ${jobId}] HLS progress: ${percent}%`);
+            lastLoggedPercent = percent;
+          }
+        }
       })
       .on('end', async () => {
-        console.log('\n✅ FFmpeg HLS done');
+        console.log(`✅ [Job ${jobId}] FFmpeg HLS done`);
         // Collect segment filenames
         const entries = await fs.readdir(hlsDir);
         const segments = entries.filter(f => f.endsWith('.ts')).sort();
         resolve({ hlsDir, manifestPath, segments });
       })
       .on('error', (err, _stdout, stderr) => {
-        console.error('FFmpeg error:', err.message, stderr?.slice(-300));
+        console.error(`❌ [Job ${jobId}] FFmpeg error:`, err.message, stderr?.slice(-300));
         reject(err);
       })
       .run();
@@ -564,9 +585,82 @@ function uploadToCloudinary(buffer, options) {
   });
 }
 
+// Background transcoding runner to avoid blocking HTTP requests
+async function runBackgroundTranscode(jobId, uploadedFilePath, originalname, size, baseId, cloudFolder) {
+  let hlsDir = null;
+  try {
+    console.log(`🎬 [BG Job ${jobId}] Starting HLS transcoding: ${originalname} (${(size / 1024 / 1024).toFixed(1)} MB)`);
+    
+    // 1. Transcode
+    const hlsResult = await transcodeToHLS(uploadedFilePath, baseId);
+    hlsDir = hlsResult.hlsDir;
+
+    // 2. Upload segments
+    const job = transcodeJobs.get(jobId);
+    if (job) job.status = 'uploading';
+    
+    const { manifestUrl } = await uploadHLSToCloudinary(
+      hlsDir, hlsResult.manifestPath, hlsResult.segments, cloudFolder, baseId
+    );
+
+    // 3. Probing duration
+    const duration = await new Promise((resolve) => {
+      ffmpeg.ffprobe(uploadedFilePath, (err, meta) => {
+        resolve(err ? 0 : (meta.format?.duration || 0));
+      });
+    });
+
+    // 4. Save metadata to DB
+    const song = {
+      id: uuidv4(),
+      cloudinaryId: `${cloudFolder}/${baseId}/index`,
+      originalName: originalname,
+      title: path.parse(originalname).name,
+      artist: 'Unknown Artist',
+      album: '',
+      duration,
+      size,
+      uploadedAt: Date.now(),
+      url: manifestUrl,
+      path: manifestUrl,
+      mediaType: 'video',
+      isHLS: true,
+    };
+
+    songs.set(song.id, song);
+    await saveSongsToDB();
+
+    // Broadcast update
+    io.emit('library-updated', { song });
+
+    // Mark job done
+    if (job) {
+      job.status = 'completed';
+      job.song = song;
+    }
+    console.log(`✅ [BG Job ${jobId}] Success: Transcoded & uploaded ${originalname}`);
+
+  } catch (error) {
+    console.error(`❌ [BG Job ${jobId}] Failure:`, error);
+    const job = transcodeJobs.get(jobId);
+    if (job) {
+      job.status = 'failed';
+      job.error = error.message;
+    }
+  } finally {
+    // Delete local temp original video file
+    if (uploadedFilePath) {
+      await fs.unlink(uploadedFilePath).catch(e => console.warn('Unlink original file warning:', e.message));
+    }
+    // Delete local HLS temporary folder
+    if (hlsDir) {
+      await fs.rm(hlsDir, { recursive: true, force: true }).catch(e => console.warn('Remove hlsDir warning:', e.message));
+    }
+  }
+}
+
 app.post('/api/upload', upload.single('audio'), async (req, res) => {
   let uploadedFilePath = null;
-  let hlsDir = null;
 
   try {
     if (!req.file) {
@@ -578,11 +672,13 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
     const isVideo = VIDEO_EXTS.test(name) || VIDEO_MIME.includes(req.file.mimetype);
     const mediaType = isVideo ? 'video' : 'audio';
 
-    // Server-side duplicate check by original filename
+    // Duplicate check
     const incomingNoExt = path.parse(req.file.originalname.toLowerCase().trim()).name;
     for (const existing of songs.values()) {
       const existingNoExt = path.parse((existing.originalName || '').toLowerCase().trim()).name;
       if (existingNoExt === incomingNoExt) {
+        // Delete uploaded file immediately
+        await fs.unlink(uploadedFilePath).catch(() => {});
         return res.status(409).json({
           success: false,
           message: `"${existing.title}" already exists in your library`
@@ -590,60 +686,48 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
       }
     }
 
-    let songUrl, cloudinaryId, duration = 0;
-    let isHLS = false;
     const baseId      = `${Date.now()}-${uuidv4().slice(0, 8)}`;
     const cloudFolder = 'musicjam';
 
     if (isVideo) {
-      // ── VIDEO: transcode to HLS → upload tiny segments ──────────
-      console.log(`🎬 Transcoding video to HLS: ${req.file.originalname} (${(req.file.size / 1024 / 1024).toFixed(1)} MB)`);
-      const hlsResult = await transcodeToHLS(uploadedFilePath, baseId);
-      hlsDir = hlsResult.hlsDir;
-
-      const { manifestUrl } = await uploadHLSToCloudinary(
-        hlsDir, hlsResult.manifestPath, hlsResult.segments, cloudFolder, baseId
-      );
-
-      songUrl     = manifestUrl;
-      cloudinaryId = `${cloudFolder}/${baseId}/index`;
-      isHLS        = true;
-
-      // Get duration from ffprobe
-      duration = await new Promise((resolve) => {
-        ffmpeg.ffprobe(uploadedFilePath, (err, meta) => {
-          resolve(err ? 0 : (meta.format?.duration || 0));
-        });
+      const jobId = uuidv4();
+      transcodeJobs.set(jobId, {
+        status: 'transcoding',
+        progress: 0,
+        song: null,
+        error: null
       });
 
+      // Run HLS async process in background, do not await!
+      runBackgroundTranscode(jobId, uploadedFilePath, req.file.originalname, req.file.size, baseId, cloudFolder);
+
+      // Return status immediately with jobId
+      return res.json({ success: true, isAsync: true, jobId });
+
     } else {
-      // ── AUDIO: upload directly (audio files are always <100 MB) ──
+      // Audio stream is directly uploaded and processed synchronously
       let metadata = {};
       try { metadata = await musicMetadata.parseFile(uploadedFilePath); } catch (e) {}
-      duration = metadata.format?.duration || 0;
+      let duration = metadata.format?.duration || 0;
 
       const cloudResult = await cloudinary.uploader.upload(uploadedFilePath, {
-        resource_type: 'video', // Cloudinary uses 'video' for all audio/video
+        resource_type: 'video',
         folder: cloudFolder,
         public_id: baseId,
         use_filename: false,
       });
 
-      songUrl      = cloudResult.secure_url;
-      cloudinaryId = cloudResult.public_id;
+      const songUrl      = cloudResult.secure_url;
+      const cloudinaryId = cloudResult.public_id;
       duration     = duration || cloudResult.duration || 0;
-
-      // Extract rich metadata
-      let metadata2 = {};
-      try { metadata2 = await musicMetadata.parseFile(uploadedFilePath); } catch (e) {}
 
       const song = {
         id: uuidv4(),
         cloudinaryId,
         originalName: req.file.originalname,
-        title: metadata2.common?.title || path.parse(req.file.originalname).name,
-        artist: metadata2.common?.artist || 'Unknown Artist',
-        album: metadata2.common?.album || '',
+        title: metadata.common?.title || path.parse(req.file.originalname).name,
+        artist: metadata.common?.artist || 'Unknown Artist',
+        album: metadata.common?.album || '',
         duration,
         size: req.file.size,
         uploadedAt: Date.now(),
@@ -652,48 +736,51 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
         mediaType,
         isHLS: false,
       };
+
       songs.set(song.id, song);
       await saveSongsToDB();
       io.emit('library-updated', { song });
+
+      // Clean up temp file
+      await fs.unlink(uploadedFilePath).catch(() => {});
+
       return res.json({ success: true, song });
     }
 
-    // ── VIDEO song record ────────────────────────────────────────
-    const song = {
-      id: uuidv4(),
-      cloudinaryId,
-      originalName: req.file.originalname,
-      title: path.parse(req.file.originalname).name,
-      artist: 'Unknown Artist',
-      album: '',
-      duration,
-      size: req.file.size,
-      uploadedAt: Date.now(),
-      url: songUrl,
-      path: songUrl,
-      mediaType,
-      isHLS,
-    };
-
-    songs.set(song.id, song);
-    await saveSongsToDB();
-    io.emit('library-updated', { song });
-    res.json({ success: true, song });
-
   } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ success: false, message: `Upload failed: ${error.message}` });
-  } finally {
-    // Clean up temp input file
+    console.error('Upload handler error:', error);
     if (uploadedFilePath) {
-      fs.unlink(uploadedFilePath).catch(err => console.error('Failed to clean up temp file:', err.message));
+      await fs.unlink(uploadedFilePath).catch(() => {});
     }
-    // Clean up HLS temp dir
-    if (hlsDir) {
-      fs.rm(hlsDir, { recursive: true, force: true }).catch(() => {});
-    }
+    res.status(500).json({ success: false, message: `Upload failed: ${error.message}` });
   }
 });
+
+// GET status endpoint of HLS transcoding jobs
+app.get('/api/upload/status/:jobId', (req, res) => {
+  const { jobId } = req.params;
+  const job = transcodeJobs.get(jobId);
+
+  if (!job) {
+    return res.status(404).json({ success: false, message: 'Upload job not found' });
+  }
+
+  res.json({
+    success: true,
+    status: job.status,
+    progress: job.progress,
+    song: job.song,
+    error: job.error
+  });
+
+  // Automatically clean up job mapping from memory once finished
+  if (job.status === 'completed' || job.status === 'failed') {
+    setTimeout(() => {
+      transcodeJobs.delete(jobId);
+    }, 15000); // Keep it around for 15s to let final poll request catch it safely
+  }
+});
+
 
 app.get('/api/library', (req, res) => {
   const library = Array.from(songs.values()).sort((a, b) => b.uploadedAt - a.uploadedAt);
@@ -725,11 +812,24 @@ app.delete('/api/library/:songId', async (req, res) => {
   }
 
   try {
-    // Cloudinary uses resource_type 'video' for both audio and video files
+    // Cloudinary resource deletion logic
     if (song.cloudinaryId) {
-      await cloudinary.uploader.destroy(song.cloudinaryId, {
-        resource_type: 'video'
-      }).catch(e => console.warn('Cloudinary delete warning:', e.message));
+      if (song.isHLS) {
+        // Delete all raw files under the HLS folder prefix (manifest + chunks)
+        const prefix = song.cloudinaryId.replace('/index', '/');
+        await cloudinary.api.delete_resources_by_prefix(prefix, {
+          resource_type: 'raw'
+        }).catch(e => console.warn('Cloudinary HLS segments deletion warning:', e.message));
+
+        // Delete the now empty folder
+        const folderPath = song.cloudinaryId.substring(0, song.cloudinaryId.lastIndexOf('/'));
+        await cloudinary.api.delete_folder(folderPath).catch(() => {});
+      } else {
+        // Normal audio or video file is 'video' resource type
+        await cloudinary.uploader.destroy(song.cloudinaryId, {
+          resource_type: 'video'
+        }).catch(e => console.warn('Cloudinary delete warning:', e.message));
+      }
     }
 
     songs.delete(songId);
@@ -860,6 +960,22 @@ io.on('connection', (socket) => {
     });
     
     console.log(`User ${socket.nickname} (${socket.id}) joined room ${roomCode}`);
+  });
+
+  socket.on('sync-request', () => {
+    if (!socket.currentRoom) return;
+    const room = rooms.get(socket.currentRoom);
+    if (!room) return;
+    
+    socket.emit('playback-state', {
+      isPlaying: room.isPlaying,
+      currentSong: room.currentSong,
+      currentTime: room.getCurrentTime(),
+      queue: room.queue,
+      repeatMode: room.repeatMode,
+      hasPrev: room.history.length > 0,
+      history: room.history.slice(-10).reverse()
+    });
   });
   
   socket.on('add-to-queue', (data) => {

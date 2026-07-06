@@ -402,7 +402,11 @@ class MusicJamApp {
                     // Server-side duplicate — resolve silently (client already warned)
                     resolve(null);
                 } else if (xhr.status === 200 && response.success) {
-                    resolve(response.song);
+                    if (response.isAsync) {
+                        this.pollUploadStatus(response.jobId, resolve, reject, statusCallback);
+                    } else {
+                        resolve(response.song);
+                    }
                 } else {
                     reject(new Error(response.message || `HTTP ${xhr.status}`));
                 }
@@ -415,6 +419,36 @@ class MusicJamApp {
             xhr.open('POST', '/api/upload');
             xhr.send(formData);
         });
+    }
+
+    pollUploadStatus(jobId, resolve, reject, statusCallback) {
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/upload/status/${jobId}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                
+                if (data.success) {
+                    if (data.status === 'transcoding') {
+                        if (statusCallback) statusCallback(`🎬 Converting video to HLS… (${data.progress}%)`);
+                    } else if (data.status === 'uploading') {
+                        if (statusCallback) statusCallback('📤 Uploading segments to Cloudinary…');
+                    } else if (data.status === 'completed') {
+                        clearInterval(interval);
+                        resolve(data.song);
+                    } else if (data.status === 'failed') {
+                        clearInterval(interval);
+                        reject(new Error(data.error || 'Conversion failed'));
+                    }
+                } else {
+                    clearInterval(interval);
+                    reject(new Error(data.message || 'Status check failed'));
+                }
+            } catch (err) {
+                clearInterval(interval);
+                reject(err);
+            }
+        }, 1500);
     }
     
     async loadMusicLibrary() {

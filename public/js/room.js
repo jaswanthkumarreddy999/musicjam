@@ -553,27 +553,23 @@ class RoomSocketManager {
         this.roomUploadZone.classList.remove('hidden');
         this.roomUploadArea.style.display = 'none';
         this.roomUploadProgress.classList.remove('hidden');
-        this.roomUploadBtn.textContent = 'Uploading\u2026';
+        this.roomUploadBtn.textContent = 'Uploading…';
 
         let uploaded = 0;
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|mkv|avi)$/i.test(file.name);
-            this.roomProgressText.textContent = `${isVideo ? '\uD83C\uDFAC ' : ''}Uploading ${file.name}… (0% - 0.0 MB / ${(file.size / 1024 / 1024).toFixed(1)} MB) (${i + 1}/${files.length})`;
+            this.roomProgressText.textContent = `${isVideo ? '🎬 ' : ''}Uploading ${file.name}… (0% - 0.0 MB / ${(file.size / 1024 / 1024).toFixed(1)} MB) (${i + 1}/${files.length})`;
             try {
-                await this.uploadSingleFile(file, (pct, loaded, total) => {
-                    this.roomProgressFill.style.width = `${((uploaded + pct / 100) / files.length) * 100}%`;
-                    if (isVideo && pct >= 99) {
-                        this.roomProgressText.textContent = `\uD83C\uDFAC Converting to HLS\u2026 (${i + 1}/${files.length})`;
-                    } else {
-                        const loadedMB = (loaded / (1024 * 1024)).toFixed(1);
-                        const totalMB = (total / (1024 * 1024)).toFixed(1);
-                        this.roomProgressText.textContent = `${isVideo ? '\uD83C\uDFAC ' : ''}Uploading ${file.name}… ${Math.round(pct)}% (${loadedMB} MB / ${totalMB} MB) (${i + 1}/${files.length})`;
-                    }
-                });
+                await this.uploadSingleFile(file, (adjPct, loaded, total) => {
+                    this.roomProgressFill.style.width = `${((uploaded + adjPct / 100) / files.length) * 100}%`;
+                    const loadedMB = (loaded / (1024 * 1024)).toFixed(1);
+                    const totalMB = (total / (1024 * 1024)).toFixed(1);
+                    this.roomProgressText.textContent = `${isVideo ? '🎬 ' : ''}Uploading ${file.name}… ${Math.round(adjPct * 2)}% (${loadedMB} MB / ${totalMB} MB) (${i + 1}/${files.length})`;
+                }, i, files.length, uploaded);
                 uploaded++;
             } catch (e) {
-                this.showToast(`Failed: ${file.name}`, 'error');
+                this.showToast(`Failed: ${file.name} — ${e.message}`, 'error');
             }
         }
 
@@ -584,26 +580,33 @@ class RoomSocketManager {
             this.roomFileInput.value = '';
             this.roomUploadZone.classList.add('hidden');
             this.roomUploadBtn.textContent = '⬆ Upload';
-            // library-updated socket event will refresh panel for all users
         }, 800);
     }
 
-    uploadSingleFile(file, onProgress) {
+    uploadSingleFile(file, onProgress, index, totalFiles, uploadedCount) {
+        const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|mkv|avi)$/i.test(file.name);
         return new Promise((resolve, reject) => {
             const fd = new FormData();
             fd.append('audio', file);
             const xhr = new XMLHttpRequest();
             xhr.upload.addEventListener('progress', e => {
-                if (e.lengthComputable) onProgress((e.loaded / e.total) * 100, e.loaded, e.total);
+                if (e.lengthComputable) {
+                    const pct = (e.loaded / e.total) * 100;
+                    const adjPct = isVideo ? pct / 2 : pct; // videos take transcription phase
+                    onProgress(adjPct, e.loaded, e.total);
+                }
             });
             xhr.addEventListener('load', () => {
                 const r = JSON.parse(xhr.responseText);
                 if (xhr.status === 409) {
-                    // Duplicate — treat as a soft skip, not a hard error
                     this.showToast(`Skipped: ${r.message}`, 'warning');
                     resolve(null);
                 } else if (xhr.status === 200 && r.success) {
-                    resolve(r.song);
+                    if (r.isAsync) {
+                        this.pollUploadStatus(r.jobId, resolve, reject, index, totalFiles, uploadedCount);
+                    } else {
+                        resolve(r.song);
+                    }
                 } else {
                     reject(new Error(r.message || `HTTP ${xhr.status}`));
                 }
@@ -612,6 +615,38 @@ class RoomSocketManager {
             xhr.open('POST', '/api/upload');
             xhr.send(fd);
         });
+    }
+
+    pollUploadStatus(jobId, resolve, reject, index, totalFiles, uploadedCount) {
+        const interval = setInterval(async () => {
+            try {
+                const res = await fetch(`/api/upload/status/${jobId}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                
+                if (data.success) {
+                    if (data.status === 'transcoding') {
+                        this.roomProgressText.textContent = `🎬 Converting to HLS… (${data.progress}%) (${index + 1}/${totalFiles})`;
+                        const currentProgress = 50 + (data.progress / 2);
+                        this.roomProgressFill.style.width = `${((uploadedCount + currentProgress / 100) / totalFiles) * 100}%`;
+                    } else if (data.status === 'uploading') {
+                        this.roomProgressText.textContent = `📤 Uploading segments to Cloudinary… (${index + 1}/${totalFiles})`;
+                    } else if (data.status === 'completed') {
+                        clearInterval(interval);
+                        resolve(data.song);
+                    } else if (data.status === 'failed') {
+                        clearInterval(interval);
+                        reject(new Error(data.error || 'Conversion failed'));
+                    }
+                } else {
+                    clearInterval(interval);
+                    reject(new Error(data.message || 'Status check failed'));
+                }
+            } catch (err) {
+                clearInterval(interval);
+                reject(err);
+            }
+        }, 1500);
     }
 
     /* ── Share modal ── */
