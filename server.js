@@ -15,10 +15,11 @@ const { Readable } = require('stream');
 const ffmpeg = require('fluent-ffmpeg');
 try {
   const ffmpegPath = require('ffmpeg-static');
-  const ffprobePath = require('ffprobe-static');
+  const ffprobeStatic = require('ffprobe-static');
+  const ffprobePath = ffprobeStatic.path || ffprobeStatic;
   ffmpeg.setFfmpegPath(ffmpegPath);
   ffmpeg.setFfprobePath(ffprobePath);
-  console.log('✓ Loaded static ffmpeg/ffprobe binaries');
+  console.log('✓ Loaded static ffmpeg/ffprobe binaries:', { ffmpegPath, ffprobePath });
 } catch (e) {
   console.log('⚠️ Static ffmpeg/ffprobe binaries not found. Using system fallback path.');
 }
