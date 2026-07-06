@@ -478,7 +478,7 @@ app.get('/api/rooms/:code', (req, res) => {
 // ── HLS transcoding helper ─────────────────────────────────────
 // Converts a video file to HLS segments in a temp directory.
 // Returns { hlsDir, manifestPath, segments }
-function transcodeToHLS(inputPath, jobId) {
+function transcodeToHLS(inputPath, jobId, duration = 0) {
   return new Promise((resolve, reject) => {
     const hlsDir = path.join(os.tmpdir(), `hls-${jobId}`);
     fsSync.mkdirSync(hlsDir, { recursive: true });
@@ -505,8 +505,22 @@ function transcodeToHLS(inputPath, jobId) {
       .output(manifestPath)
       .on('start', cmd => console.log('🎬 FFmpeg HLS cmd:', cmd.slice(0, 120) + '…'))
       .on('progress', p => {
+        let percent = 0;
         if (p.percent) {
-          const percent = Math.round(p.percent);
+          percent = Math.round(p.percent);
+        } else if (duration > 0 && p.timemark) {
+          // Parse timemark "HH:MM:SS.MS" to seconds
+          const parts = p.timemark.split(':');
+          if (parts.length === 3) {
+            const hrs = parseFloat(parts[0]) || 0;
+            const mins = parseFloat(parts[1]) || 0;
+            const secs = parseFloat(parts[2]) || 0;
+            const currentSecs = hrs * 3600 + mins * 60 + secs;
+            percent = Math.min(99, Math.round((currentSecs / duration) * 100));
+          }
+        }
+
+        if (percent > 0) {
           const job = transcodeJobs.get(jobId);
           if (job) job.progress = percent;
           
@@ -594,24 +608,25 @@ async function runBackgroundTranscode(jobId, uploadedFilePath, originalname, siz
   try {
     console.log(`🎬 [BG Job ${jobId}] Starting HLS transcoding: ${originalname} (${(size / 1024 / 1024).toFixed(1)} MB)`);
     
-    // 1. Transcode
-    const hlsResult = await transcodeToHLS(uploadedFilePath, baseId);
+    // 1. Probe duration first (needed for accurate HLS percentage progress tracking)
+    const duration = await new Promise((resolve) => {
+      ffmpeg.ffprobe(uploadedFilePath, (err, meta) => {
+        resolve(err ? 0 : (meta.format?.duration || 0));
+      });
+    });
+    console.log(`📝 [BG Job ${jobId}] Video duration probed: ${duration.toFixed(1)}s`);
+
+    // 2. Transcode
+    const hlsResult = await transcodeToHLS(uploadedFilePath, baseId, duration);
     hlsDir = hlsResult.hlsDir;
 
-    // 2. Upload segments
+    // 3. Upload segments
     const job = transcodeJobs.get(jobId);
     if (job) job.status = 'uploading';
     
     const { manifestUrl } = await uploadHLSToCloudinary(
       hlsDir, hlsResult.manifestPath, hlsResult.segments, cloudFolder, baseId
     );
-
-    // 3. Probing duration
-    const duration = await new Promise((resolve) => {
-      ffmpeg.ffprobe(uploadedFilePath, (err, meta) => {
-        resolve(err ? 0 : (meta.format?.duration || 0));
-      });
-    });
 
     // 4. Save metadata to DB
     const song = {
