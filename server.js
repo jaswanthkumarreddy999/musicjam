@@ -490,8 +490,10 @@ function transcodeToHLS(inputPath, jobId) {
       .outputOptions([
         '-c:v libx264',       // H.264 video codec (broad compatibility)
         '-c:a aac',           // AAC audio codec
-        '-preset veryfast',   // Fast encode, acceptable quality
-        '-crf 28',            // Quality factor (23=good, 28=smaller files)
+        '-preset ultrafast',   // Minimize memory queue size & maximize speed
+        '-crf 30',            // Reduce bitrate footprint slightly
+        '-vf scale=-2:360',   // Scale down to 360p (major savings in memory usage)
+        '-threads 1',         // Enforce single thread to prevent multi-core RAM accumulation
         '-sc_threshold 0',    // Consistent cuts
         '-g 48',              // GOP size (keyframe every 2s @24fps)
         '-keyint_min 48',
