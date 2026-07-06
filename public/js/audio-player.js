@@ -13,6 +13,7 @@ class AudioPlayer {
         this._isFullscreen = false;
         this._fsMouseTimer = null;
         this._fsMoveHandler = null;
+        this._hlsInstance = null; // hls.js instance for HLS videos
 
         this.initializeElements();
         this.bindEvents();
@@ -468,12 +469,47 @@ class AudioPlayer {
         if (!song) return;
         const mediaType = song.mediaType || 'audio';
         const url = song.url || song.path;
+        const isHLS = !!song.isHLS;
+
+        // Destroy any previous HLS.js instance
+        if (this._hlsInstance) {
+            this._hlsInstance.destroy();
+            this._hlsInstance = null;
+        }
 
         this._switchMedia(mediaType);
-        this.media.src = url;
-        this.media.load();
 
-        // Audio view info
+        if (isHLS && mediaType === 'video') {
+            // ── HLS playback via hls.js (or native for Safari) ──
+            if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+                const hls = new Hls({
+                    enableWorker: true,
+                    lowLatencyMode: false,
+                    backBufferLength: 90,
+                });
+                hls.loadSource(url);
+                hls.attachMedia(this.videoEl);
+                hls.on(Hls.Events.ERROR, (event, data) => {
+                    if (data.fatal) {
+                        console.error('HLS fatal error:', data);
+                        this.socketManager.showToast('Video playback error', 'error');
+                    }
+                });
+                this._hlsInstance = hls;
+            } else if (this.videoEl.canPlayType('application/vnd.apple.mpegurl')) {
+                // Native HLS support (Safari)
+                this.videoEl.src = url;
+                this.videoEl.load();
+            } else {
+                this.socketManager.showToast('HLS not supported in this browser', 'error');
+            }
+        } else {
+            // ── Direct src (audio or non-HLS video) ──
+            this.media.src = url;
+            this.media.load();
+        }
+
+        // Update UI labels
         document.getElementById('song-title').textContent  = song.title;
         document.getElementById('song-artist').textContent = song.artist;
         document.getElementById('song-album').textContent  = song.album || '';
@@ -481,7 +517,7 @@ class AudioPlayer {
         // Media badge
         const badge = document.getElementById('media-type-badge');
         if (badge) {
-            badge.textContent = mediaType === 'video' ? 'Video' : 'Audio';
+            badge.textContent = mediaType === 'video' ? (isHLS ? 'Video HLS' : 'Video') : 'Audio';
             badge.className   = `media-badge media-badge-${mediaType}`;
         }
 
@@ -489,7 +525,6 @@ class AudioPlayer {
         if (document.getElementById('video-title-text'))  document.getElementById('video-title-text').textContent  = song.title;
         if (document.getElementById('video-song-name'))   document.getElementById('video-song-name').textContent   = song.title;
         if (document.getElementById('video-song-artist')) document.getElementById('video-song-artist').textContent = song.artist;
-        // Fallback vinyl info (shown when video has no visual track)
         if (document.getElementById('video-fallback-title'))  document.getElementById('video-fallback-title').textContent  = song.title;
         if (document.getElementById('video-fallback-artist')) document.getElementById('video-fallback-artist').textContent = song.artist;
 
@@ -575,6 +610,11 @@ class AudioPlayer {
     }
 
     reset() {
+        // Destroy any active HLS.js instance
+        if (this._hlsInstance) {
+            this._hlsInstance.destroy();
+            this._hlsInstance = null;
+        }
         [this.audioEl, this.videoEl].forEach(el => { el.src = ''; el.load(); });
         const audioDisplay  = document.getElementById('audio-display');
         const videoDisplay  = document.getElementById('video-display');

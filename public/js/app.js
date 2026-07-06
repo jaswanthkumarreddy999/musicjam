@@ -346,6 +346,8 @@ class MusicJamApp {
                 await this.uploadSingleFile(file, (progress) => {
                     const totalProgress = ((uploadedCount + progress / 100) / totalFiles) * 100;
                     this.progressFill.style.width = `${totalProgress}%`;
+                }, (statusMsg) => {
+                    this.progressText.textContent = `${statusMsg} (${i + 1}/${totalFiles})`;
                 });
 
                 uploadedCount++;
@@ -369,7 +371,8 @@ class MusicJamApp {
         }, 1000);
     }
     
-    uploadSingleFile(file, progressCallback) {
+    uploadSingleFile(file, progressCallback, statusCallback) {
+        const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|mkv|avi)$/i.test(file.name);
         return new Promise((resolve, reject) => {
             const formData = new FormData();
             formData.append('audio', file);
@@ -380,11 +383,18 @@ class MusicJamApp {
                 if (e.lengthComputable) {
                     const percentComplete = (e.loaded / e.total) * 100;
                     progressCallback(percentComplete);
+                    // Once bytes are all sent, server is transcoding (video only)
+                    if (isVideo && percentComplete >= 99 && statusCallback) {
+                        statusCallback('🎬 Converting to HLS segments…');
+                    }
                 }
             });
             
             xhr.addEventListener('load', () => {
-                const response = JSON.parse(xhr.responseText);
+                let response;
+                try { response = JSON.parse(xhr.responseText); } catch(e) {
+                    return reject(new Error('Invalid server response'));
+                }
                 if (xhr.status === 409) {
                     // Server-side duplicate — resolve silently (client already warned)
                     resolve(null);

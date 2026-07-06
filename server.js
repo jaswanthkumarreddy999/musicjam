@@ -8,9 +8,12 @@ const compression = require('compression');
 const multer = require('multer');
 const { v4: uuidv4 } = require('uuid');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const musicMetadata = require('music-metadata');
 const cloudinary = require('cloudinary').v2;
 const { Readable } = require('stream');
+const ffmpeg = require('fluent-ffmpeg');
+const os = require('os');
 
 // ── Cloudinary config ──────────────────────────────────────────
 const CLOUD_NAME   = process.env.CLOUDINARY_CLOUD_NAME || 'lu9erudm';
@@ -44,7 +47,9 @@ app.use(helmet({
       imgSrc:        ["'self'", "data:", "https://res.cloudinary.com"],
       connectSrc:    ["'self'", "ws:", "wss:", "https://fonts.googleapis.com",
                       "https://fonts.gstatic.com", "https://api.cloudinary.com",
-                      "https://res.cloudinary.com", "https://cdn.jsdelivr.net"]
+                      "https://res.cloudinary.com", "https://cdn.jsdelivr.net",
+                      // HLS segment requests — Cloudinary raw assets
+                      "https://*.cloudinary.com"]
     }
   }
 }));
@@ -459,17 +464,116 @@ app.get('/api/rooms/:code', (req, res) => {
   });
 });
 
+// ── HLS transcoding helper ─────────────────────────────────────
+// Converts a video file to HLS segments in a temp directory.
+// Returns { hlsDir, manifestPath, segments }
+function transcodeToHLS(inputPath, jobId) {
+  return new Promise((resolve, reject) => {
+    const hlsDir = path.join(os.tmpdir(), `hls-${jobId}`);
+    fsSync.mkdirSync(hlsDir, { recursive: true });
+    const manifestPath = path.join(hlsDir, 'index.m3u8');
+    const segmentPattern = path.join(hlsDir, 'seg%04d.ts');
+
+    ffmpeg(inputPath)
+      .outputOptions([
+        '-c:v libx264',       // H.264 video codec (broad compatibility)
+        '-c:a aac',           // AAC audio codec
+        '-preset veryfast',   // Fast encode, acceptable quality
+        '-crf 28',            // Quality factor (23=good, 28=smaller files)
+        '-sc_threshold 0',    // Consistent cuts
+        '-g 48',              // GOP size (keyframe every 2s @24fps)
+        '-keyint_min 48',
+        '-hls_time 6',        // 6-second segments ≈ 3-8 MB each
+        '-hls_playlist_type vod',
+        '-hls_segment_filename', segmentPattern,
+        '-f hls',
+      ])
+      .output(manifestPath)
+      .on('start', cmd => console.log('🎬 FFmpeg HLS cmd:', cmd.slice(0, 120) + '…'))
+      .on('progress', p => {
+        if (p.percent) process.stdout.write(`\r  HLS progress: ${Math.round(p.percent)}%  `);
+      })
+      .on('end', async () => {
+        console.log('\n✅ FFmpeg HLS done');
+        // Collect segment filenames
+        const entries = await fs.readdir(hlsDir);
+        const segments = entries.filter(f => f.endsWith('.ts')).sort();
+        resolve({ hlsDir, manifestPath, segments });
+      })
+      .on('error', (err, _stdout, stderr) => {
+        console.error('FFmpeg error:', err.message, stderr?.slice(-300));
+        reject(err);
+      })
+      .run();
+  });
+}
+
+// Upload all HLS segments + manifest to Cloudinary, return manifest URL
+async function uploadHLSToCloudinary(hlsDir, manifestPath, segments, folder, baseId) {
+  const segUrls = {};
+
+  // Upload each .ts segment as a raw file
+  console.log(`📤 Uploading ${segments.length} HLS segments to Cloudinary…`);
+  for (let i = 0; i < segments.length; i++) {
+    const segFile = segments[i];
+    const segPath = path.join(hlsDir, segFile);
+    const publicId = `${folder}/${baseId}/${segFile.replace('.ts', '')}`;
+    const result = await cloudinary.uploader.upload(segPath, {
+      resource_type: 'raw',
+      public_id: publicId,
+      overwrite: true,
+    });
+    segUrls[segFile] = result.secure_url;
+    console.log(`  ✓ Segment ${i + 1}/${segments.length}: ${segFile}`);
+  }
+
+  // Read original manifest and rewrite local URIs → Cloudinary URLs
+  const originalManifest = await fs.readFile(manifestPath, 'utf8');
+  const rewrittenManifest = originalManifest.replace(/^(seg\d+\.ts)$/gm, (match) => {
+    return segUrls[match] || match;
+  });
+
+  // Upload the rewritten manifest as a raw file
+  const manifestPublicId = `${folder}/${baseId}/index`;
+  const manifestBuffer = Buffer.from(rewrittenManifest, 'utf8');
+  const manifestResult = await uploadToCloudinary(manifestBuffer, {
+    resource_type: 'raw',
+    public_id: manifestPublicId,
+    overwrite: true,
+    format: 'm3u8',
+  });
+
+  console.log('☁️  HLS manifest uploaded:', manifestResult.secure_url);
+  return {
+    manifestUrl: manifestResult.secure_url,
+    segmentPublicIds: Object.values(segUrls).map(u => u)
+  };
+}
+
+// Generic Cloudinary buffer upload helper (used for DB + manifests)
+function uploadToCloudinary(buffer, options) {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(options, (err, result) => {
+      if (err) return reject(err);
+      resolve(result);
+    });
+    const r = new Readable();
+    r.push(buffer);
+    r.push(null);
+    r.pipe(stream);
+  });
+}
+
 app.post('/api/upload', upload.single('audio'), async (req, res) => {
   let uploadedFilePath = null;
-  
+  let hlsDir = null;
+
   try {
     if (!req.file) {
       return res.status(400).json({ success: false, message: 'No file provided' });
     }
-    
-    // Track path for cleanup in finally block
-    uploadedFilePath = req.file.path;
 
+    uploadedFilePath = req.file.path;
     const name = req.file.originalname.toLowerCase();
     const isVideo = VIDEO_EXTS.test(name) || VIDEO_MIME.includes(req.file.mimetype);
     const mediaType = isVideo ? 'video' : 'audio';
@@ -486,53 +590,107 @@ app.post('/api/upload', upload.single('audio'), async (req, res) => {
       }
     }
 
-    // Upload direct from disk to Cloudinary using upload_large (handles chunking for files >100MB!)
-    const cloudResult = await cloudinary.uploader.upload_large(uploadedFilePath, {
-      resource_type: 'video',
-      folder: 'musicjam',
-      public_id: `${Date.now()}-${uuidv4().slice(0, 8)}`,
-      use_filename: false,
-      chunk_size: 20000000 // 20MB chunks
-    });
+    let songUrl, cloudinaryId, duration = 0;
+    let isHLS = false;
+    const baseId      = `${Date.now()}-${uuidv4().slice(0, 8)}`;
+    const cloudFolder = 'musicjam';
 
-    // Extract audio metadata directly from the file (audio only)
-    let metadata = {};
-    if (mediaType === 'audio') {
-      try {
-        metadata = await musicMetadata.parseFile(uploadedFilePath);
-      } catch (e) {
-        console.warn('Metadata extraction failed:', e.message);
-      }
+    if (isVideo) {
+      // ── VIDEO: transcode to HLS → upload tiny segments ──────────
+      console.log(`🎬 Transcoding video to HLS: ${req.file.originalname} (${(req.file.size / 1024 / 1024).toFixed(1)} MB)`);
+      const hlsResult = await transcodeToHLS(uploadedFilePath, baseId);
+      hlsDir = hlsResult.hlsDir;
+
+      const { manifestUrl } = await uploadHLSToCloudinary(
+        hlsDir, hlsResult.manifestPath, hlsResult.segments, cloudFolder, baseId
+      );
+
+      songUrl     = manifestUrl;
+      cloudinaryId = `${cloudFolder}/${baseId}/index`;
+      isHLS        = true;
+
+      // Get duration from ffprobe
+      duration = await new Promise((resolve) => {
+        ffmpeg.ffprobe(uploadedFilePath, (err, meta) => {
+          resolve(err ? 0 : (meta.format?.duration || 0));
+        });
+      });
+
+    } else {
+      // ── AUDIO: upload directly (audio files are always <100 MB) ──
+      let metadata = {};
+      try { metadata = await musicMetadata.parseFile(uploadedFilePath); } catch (e) {}
+      duration = metadata.format?.duration || 0;
+
+      const cloudResult = await cloudinary.uploader.upload(uploadedFilePath, {
+        resource_type: 'video', // Cloudinary uses 'video' for all audio/video
+        folder: cloudFolder,
+        public_id: baseId,
+        use_filename: false,
+      });
+
+      songUrl      = cloudResult.secure_url;
+      cloudinaryId = cloudResult.public_id;
+      duration     = duration || cloudResult.duration || 0;
+
+      // Extract rich metadata
+      let metadata2 = {};
+      try { metadata2 = await musicMetadata.parseFile(uploadedFilePath); } catch (e) {}
+
+      const song = {
+        id: uuidv4(),
+        cloudinaryId,
+        originalName: req.file.originalname,
+        title: metadata2.common?.title || path.parse(req.file.originalname).name,
+        artist: metadata2.common?.artist || 'Unknown Artist',
+        album: metadata2.common?.album || '',
+        duration,
+        size: req.file.size,
+        uploadedAt: Date.now(),
+        url: songUrl,
+        path: songUrl,
+        mediaType,
+        isHLS: false,
+      };
+      songs.set(song.id, song);
+      await saveSongsToDB();
+      io.emit('library-updated', { song });
+      return res.json({ success: true, song });
     }
 
+    // ── VIDEO song record ────────────────────────────────────────
     const song = {
       id: uuidv4(),
-      cloudinaryId: cloudResult.public_id,
+      cloudinaryId,
       originalName: req.file.originalname,
-      title: metadata.common?.title || path.parse(req.file.originalname).name,
-      artist: metadata.common?.artist || 'Unknown Artist',
-      album: metadata.common?.album || '',
-      duration: metadata.format?.duration || cloudResult.duration || 0,
+      title: path.parse(req.file.originalname).name,
+      artist: 'Unknown Artist',
+      album: '',
+      duration,
       size: req.file.size,
       uploadedAt: Date.now(),
-      url: cloudResult.secure_url,      // permanent Cloudinary URL
-      mediaType,                         // 'audio' | 'video'
-      // keep path for backwards compat
-      path: cloudResult.secure_url,
+      url: songUrl,
+      path: songUrl,
+      mediaType,
+      isHLS,
     };
 
     songs.set(song.id, song);
     await saveSongsToDB();
     io.emit('library-updated', { song });
-
     res.json({ success: true, song });
+
   } catch (error) {
     console.error('Upload error:', error);
     res.status(500).json({ success: false, message: `Upload failed: ${error.message}` });
   } finally {
-    // ALWAYS clean up the local disk file so Render doesn't run out of storage
+    // Clean up temp input file
     if (uploadedFilePath) {
       fs.unlink(uploadedFilePath).catch(err => console.error('Failed to clean up temp file:', err.message));
+    }
+    // Clean up HLS temp dir
+    if (hlsDir) {
+      fs.rm(hlsDir, { recursive: true, force: true }).catch(() => {});
     }
   }
 });

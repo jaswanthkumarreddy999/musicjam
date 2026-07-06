@@ -176,9 +176,12 @@ class RoomSocketManager {
             this.roomUploadArea.addEventListener('drop', e => {
                 e.preventDefault();
                 this.roomUploadArea.classList.remove('dragover');
-                const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|flac|aac|wma)$/i.test(f.name));
+                const files = Array.from(e.dataTransfer.files).filter(f =>
+                    f.type.startsWith('audio/') || f.type.startsWith('video/') ||
+                    /\.(mp3|wav|ogg|m4a|flac|aac|wma|mp4|webm|mov|mkv|avi)$/i.test(f.name)
+                );
                 if (files.length) this.uploadFiles(files);
-                else this.showToast('No audio files found', 'error');
+                else this.showToast('No audio or video files found', 'error');
             });
         }
         if (this.roomFileInput) {
@@ -550,15 +553,19 @@ class RoomSocketManager {
         this.roomUploadZone.classList.remove('hidden');
         this.roomUploadArea.style.display = 'none';
         this.roomUploadProgress.classList.remove('hidden');
-        this.roomUploadBtn.textContent = 'Uploading…';
+        this.roomUploadBtn.textContent = 'Uploading\u2026';
 
         let uploaded = 0;
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
-            this.roomProgressText.textContent = `${file.name} (${i + 1}/${files.length})`;
+            const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|mkv|avi)$/i.test(file.name);
+            this.roomProgressText.textContent = `${isVideo ? '\uD83C\uDFAC ' : ''}${file.name} (${i + 1}/${files.length})`;
             try {
                 await this.uploadSingleFile(file, pct => {
                     this.roomProgressFill.style.width = `${((uploaded + pct / 100) / files.length) * 100}%`;
+                    if (isVideo && pct >= 99) {
+                        this.roomProgressText.textContent = `\uD83C\uDFAC Converting to HLS\u2026 (${i + 1}/${files.length})`;
+                    }
                 });
                 uploaded++;
             } catch (e) {
