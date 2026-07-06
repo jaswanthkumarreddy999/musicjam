@@ -559,12 +559,16 @@ class RoomSocketManager {
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const isVideo = file.type.startsWith('video/') || /\.(mp4|webm|mov|mkv|avi)$/i.test(file.name);
-            this.roomProgressText.textContent = `${isVideo ? '\uD83C\uDFAC ' : ''}${file.name} (${i + 1}/${files.length})`;
+            this.roomProgressText.textContent = `${isVideo ? '\uD83C\uDFAC ' : ''}Uploading ${file.name}… (0% - 0.0 MB / ${(file.size / 1024 / 1024).toFixed(1)} MB) (${i + 1}/${files.length})`;
             try {
-                await this.uploadSingleFile(file, pct => {
+                await this.uploadSingleFile(file, (pct, loaded, total) => {
                     this.roomProgressFill.style.width = `${((uploaded + pct / 100) / files.length) * 100}%`;
                     if (isVideo && pct >= 99) {
                         this.roomProgressText.textContent = `\uD83C\uDFAC Converting to HLS\u2026 (${i + 1}/${files.length})`;
+                    } else {
+                        const loadedMB = (loaded / (1024 * 1024)).toFixed(1);
+                        const totalMB = (total / (1024 * 1024)).toFixed(1);
+                        this.roomProgressText.textContent = `${isVideo ? '\uD83C\uDFAC ' : ''}Uploading ${file.name}… ${Math.round(pct)}% (${loadedMB} MB / ${totalMB} MB) (${i + 1}/${files.length})`;
                     }
                 });
                 uploaded++;
@@ -590,7 +594,7 @@ class RoomSocketManager {
             fd.append('audio', file);
             const xhr = new XMLHttpRequest();
             xhr.upload.addEventListener('progress', e => {
-                if (e.lengthComputable) onProgress((e.loaded / e.total) * 100);
+                if (e.lengthComputable) onProgress((e.loaded / e.total) * 100, e.loaded, e.total);
             });
             xhr.addEventListener('load', () => {
                 const r = JSON.parse(xhr.responseText);

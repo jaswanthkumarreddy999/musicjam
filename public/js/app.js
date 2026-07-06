@@ -341,11 +341,14 @@ class MusicJamApp {
             const file = toUpload[i];
 
             try {
-                this.progressText.textContent = `Uploading ${file.name}… (${i + 1}/${totalFiles})`;
+                this.progressText.textContent = `Uploading ${file.name}… (0% - 0.0 MB / ${(file.size / 1024 / 1024).toFixed(1)} MB) (${i + 1}/${totalFiles})`;
 
-                await this.uploadSingleFile(file, (progress) => {
+                await this.uploadSingleFile(file, (progress, loaded, total) => {
                     const totalProgress = ((uploadedCount + progress / 100) / totalFiles) * 100;
                     this.progressFill.style.width = `${totalProgress}%`;
+                    const loadedMB = (loaded / (1024 * 1024)).toFixed(1);
+                    const totalMB = (total / (1024 * 1024)).toFixed(1);
+                    this.progressText.textContent = `Uploading ${file.name}… ${Math.round(progress)}% (${loadedMB} MB / ${totalMB} MB) (${i + 1}/${totalFiles})`;
                 }, (statusMsg) => {
                     this.progressText.textContent = `${statusMsg} (${i + 1}/${totalFiles})`;
                 });
@@ -382,7 +385,7 @@ class MusicJamApp {
             xhr.upload.addEventListener('progress', (e) => {
                 if (e.lengthComputable) {
                     const percentComplete = (e.loaded / e.total) * 100;
-                    progressCallback(percentComplete);
+                    progressCallback(percentComplete, e.loaded, e.total);
                     // Once bytes are all sent, server is transcoding (video only)
                     if (isVideo && percentComplete >= 99 && statusCallback) {
                         statusCallback('🎬 Converting to HLS segments…');
