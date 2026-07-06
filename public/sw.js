@@ -1,7 +1,6 @@
-// Service Worker for MusicJam PWA
-const CACHE_NAME = 'musicjam-v2.1.0';
-const STATIC_CACHE = 'musicjam-static-v3';
-const DYNAMIC_CACHE = 'musicjam-dynamic-v3';
+const CACHE_NAME = 'musicjam-v2.2.0';
+const STATIC_CACHE = 'musicjam-static-v4';
+const DYNAMIC_CACHE = 'musicjam-dynamic-v4';
 
 // Files to cache for offline functionality
 const STATIC_ASSETS = [
