@@ -1529,6 +1529,24 @@
     font-size: .76rem; color: hsl(270,60%,72%);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     max-width: 100%;
+    margin-bottom: 12px;
+}
+
+.wt-join-btn {
+    width: 100%;
+    justify-content: center;
+    background: hsla(270,80%,60%,.2);
+    border: 1px solid hsla(270,80%,60%,.5);
+    color: hsl(270,80%,85%);
+    font-weight: 700;
+    transition: all var(--fast);
+    display: inline-flex; align-items: center; gap: 6px;
+}
+.wt-join-btn:hover {
+    background: hsla(270,80%,60%,.35);
+    border-color: hsl(270,80%,75%);
+    color: #fff;
+    box-shadow: 0 0 14px hsla(270,80%,60%,.3);
 }
 
 /* ── Responsive ── */

@@ -259,6 +259,20 @@ class RoomSocketManager {
         if (this.wtEndBtn) {
             this.wtEndBtn.addEventListener('click', () => this.endWatchSession());
         }
+        // Guest "Tap to Join" — provides the user gesture needed to unlock autoplay
+        const wtJoinBtn = document.getElementById('wt-join-btn');
+        if (wtJoinBtn) {
+            wtJoinBtn.addEventListener('click', () => {
+                // Request a fresh sync from the server — server will send session-playback-state
+                this.socket.emit('sync-request');
+                wtJoinBtn.textContent = '⏳ Syncing…';
+                wtJoinBtn.disabled = true;
+                setTimeout(() => {
+                    wtJoinBtn.textContent = '▶ Tap to Join & Sync';
+                    wtJoinBtn.disabled = false;
+                }, 3000);
+            });
+        }
     }
 
     generateUserId() {
@@ -308,7 +322,7 @@ class RoomSocketManager {
         this.socket.on('playback-state', data => { this.handlePlaybackState(data); });
 
         this.socket.on('seek-update', data => {
-            this.audioPlayer.syncPlayback(data.currentTime, !this.audioPlayer.audio.paused, data.timestamp);
+            this.audioPlayer.syncPlayback(data.currentTime, !this.audioPlayer.media.paused, data.timestamp);
         });
 
         this.socket.on('repeat-mode-updated', data => {
@@ -341,6 +355,14 @@ class RoomSocketManager {
         this.socket.on('session-video-loaded', data => {
             const { videoId, filename, duration } = data;
             this.wtSessionVideoId = videoId;
+
+            // Determine role BEFORE loading so the UI branch is correct
+            const wasNone = this.wtMode === 'none';
+            if (wasNone) {
+                // We received this without opening Watch — we're a guest
+                this.wtMode = 'guest';
+            }
+
             // Load into the player as a direct-URL video (no HLS, no Cloudinary)
             const fakeSessionSong = {
                 id: `session-${videoId}`,
@@ -356,33 +378,48 @@ class RoomSocketManager {
             };
             this.audioPlayer.loadSong(fakeSessionSong);
 
-            if (this.wtMode === 'guest') {
-                // Guest: show the guest-waiting panel with filename
-                this._wtShowState('guest');
-                if (this.wtGuestFilename) this.wtGuestFilename.textContent = filename;
-            } else if (this.wtMode === 'host') {
+            if (this.wtMode === 'host') {
                 // Host: update the loaded panel with probed duration from server
                 this._wtUpdateLoadedPanel(filename, duration);
             } else {
-                // Someone else's session started — make us a guest and open the WT zone
-                this.wtMode = 'guest';
+                // Guest: open the WT zone and show the guest panel
                 if (this.wtZone) {
                     this.wtZone.classList.remove('hidden');
-                    this.wtToggleBtn.classList.add('wt-active');
+                    if (this.wtToggleBtn) this.wtToggleBtn.classList.add('wt-active');
                 }
                 this._wtShowState('guest');
                 if (this.wtGuestFilename) this.wtGuestFilename.textContent = filename;
-                this.showToast(`🎬 Watch Together started: ${this._wtStripExtension(filename)}`, 'info');
+                if (wasNone) {
+                    this.showToast(`🎬 Watch Together started: ${this._wtStripExtension(filename)}`, 'info');
+                }
             }
         });
 
-        // Playback state for session video (play/pause/seek synced separately)
+        // Playback state for session video — apply directly to media element.
+        // We do NOT go through socketManager.play()/pause() here — that would
+        // re-emit socket events and cause a feedback loop between devices.
         this.socket.on('session-playback-state', data => {
+            if (!this.wtSessionVideoId) return; // guard — ignore if no session active
             const { isPlaying, currentTime, timestamp } = data;
-            // Compute lag-corrected time
+            const ap = this.audioPlayer;
+            const media = ap.media;
+
+            // Lag-correct the server timestamp
             const lag = (Date.now() - timestamp) / 1000;
-            const corrected = isPlaying ? currentTime + lag : currentTime;
-            this.audioPlayer.syncPlayback(corrected, isPlaying, timestamp);
+            const adjusted = isPlaying ? currentTime + lag : currentTime;
+
+            // Seek if drift > 1s
+            if (Math.abs(media.currentTime - adjusted) > ap.syncThreshold) {
+                ap.seek(adjusted); // AudioPlayer.seek() — touches media directly, no socket
+            }
+
+            // Play/pause directly on the media element — no socket emission
+            if (isPlaying && media.paused) {
+                ap.play(); // AudioPlayer.play() — calls media.play() + updates UI only
+            }
+            if (!isPlaying && !media.paused) {
+                ap.pause(); // AudioPlayer.pause() — calls media.pause() + updates UI only
+            }
         });
 
         // Session ended by host
@@ -397,6 +434,9 @@ class RoomSocketManager {
                 this._wtShowState('idle');
             }
             this.wtMode = 'none';
+            // Close the WT zone and reset button
+            if (this.wtZone) this.wtZone.classList.add('hidden');
+            if (this.wtToggleBtn) this.wtToggleBtn.classList.remove('wt-active');
         });
     }
 

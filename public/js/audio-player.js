@@ -14,6 +14,7 @@ class AudioPlayer {
         this._fsMouseTimer = null;
         this._fsMoveHandler = null;
         this._hlsInstance = null; // hls.js instance for HLS videos
+        this.isSessionVideo = false; // true while a Watch Together session is active
 
         this.initializeElements();
         this.bindEvents();
@@ -285,6 +286,8 @@ class AudioPlayer {
         });
         el.addEventListener('ended', () => {
             if (el !== this.media) return;
+            // Session videos must NOT trigger next-song — the host manages the session lifecycle
+            if (this.isSessionVideo) return;
             this.socketManager.nextSong();
         });
         el.addEventListener('error', () => {
@@ -471,6 +474,9 @@ class AudioPlayer {
         const url = song.url || song.path;
         const isHLS = !!song.isHLS;
 
+        // Track whether this is an ephemeral Watch Together session video
+        this.isSessionVideo = !!song.isSession;
+
         // Destroy any previous HLS.js instance
         if (this._hlsInstance) {
             this._hlsInstance.destroy();
@@ -615,6 +621,7 @@ class AudioPlayer {
             this._hlsInstance.destroy();
             this._hlsInstance = null;
         }
+        this.isSessionVideo = false;
         [this.audioEl, this.videoEl].forEach(el => { el.src = ''; el.load(); });
         const audioDisplay  = document.getElementById('audio-display');
         const videoDisplay  = document.getElementById('video-display');
