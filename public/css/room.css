@@ -1560,3 +1560,23 @@
 .wt-join-btn:hover  { filter: brightness(1.15); transform: translateY(-1px); }
 .wt-join-btn:active { transform: scale(.97); }
 .wt-join-btn:disabled { opacity: .6; cursor: default; transform: none; filter: none; }
+
+/* ── Watch Together: join button (guest autoplay unlock) ── */
+.wt-join-btn {
+    width: 100%; margin-top: 12px;
+    justify-content: center;
+    background: hsla(270,80%,60%,.2);
+    border: 1px solid hsla(270,80%,60%,.5);
+    color: hsl(270,80%,88%);
+    font-size: .82rem; font-weight: 700;
+    padding: 9px 0;
+    transition: all var(--fast);
+    display: inline-flex; align-items: center; gap: 6px;
+    animation: wtPulse 1.8s ease-in-out infinite;
+}
+.wt-join-btn:hover {
+    background: hsla(270,80%,60%,.38);
+    border-color: hsl(270,80%,70%);
+    color: #fff;
+    animation: none;
+}
