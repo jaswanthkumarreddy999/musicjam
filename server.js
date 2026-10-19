@@ -1047,7 +1047,22 @@ io.on('connection', (socket) => {
       return;
     }
     
-    // Leave any previous room
+    // ── Evict any existing socket with the same userId ──
+    // This prevents ghost users when a browser reconnects (e.g. Render cold start
+    // causes a brief disconnect+reconnect, adding a 2nd entry for the same person).
+    for (const [existingSocketId, meta] of users.entries()) {
+      if (meta.userId === userId && existingSocketId !== socket.id) {
+        const existingSocket = io.sockets.sockets.get(existingSocketId);
+        // Remove from room data
+        room.removeUser(existingSocketId);
+        users.delete(existingSocketId);
+        // Disconnect the stale socket silently
+        if (existingSocket) existingSocket.disconnect(true);
+        console.log(`🔄 Evicted stale socket ${existingSocketId} for userId ${userId}`);
+      }
+    }
+
+    // Leave any previous room on this socket
     if (socket.currentRoom) {
       socket.leave(socket.currentRoom);
       const prevRoom = rooms.get(socket.currentRoom);
@@ -1367,11 +1382,17 @@ io.on('connection', (socket) => {
   socket.on('session-video-play', () => {
     const room = rooms.get(socket.currentRoom);
     if (!room || !room.sessionVideo) return;
+    // Compute live-corrected time before marking as playing
+    // (accounts for any drift since the last pause/seek)
+    const liveTime = room.sessionIsPlaying
+      ? room.sessionCurrentTime + (Date.now() - room.sessionLastUpdate) / 1000
+      : room.sessionCurrentTime;
+    room.sessionCurrentTime = liveTime;
     room.sessionIsPlaying = true;
     room.sessionLastUpdate = Date.now();
     io.to(socket.currentRoom).emit('session-playback-state', {
       isPlaying: true,
-      currentTime: room.sessionCurrentTime,
+      currentTime: liveTime,
       timestamp: Date.now()
     });
   });

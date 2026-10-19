@@ -377,16 +377,37 @@ class RoomSocketManager {
                 if (this.wtZone) this.wtZone.classList.remove('hidden');
                 if (this.wtToggleBtn) this.wtToggleBtn.classList.add('wt-active');
 
-                // Reset join button so guest can always tap it
-                const joinBtn = document.getElementById('wt-join-btn');
-                if (joinBtn) {
-                    joinBtn.textContent = '▶ Tap to Watch';
-                    joinBtn.disabled = false;
-                    joinBtn.style.background = '';
-                }
-
                 this._wtShowState('guest');
                 if (this.wtGuestFilename) this.wtGuestFilename.textContent = filename;
+
+                // Show "Buffering…" while the video loads, then unlock the join button
+                const joinBtn = document.getElementById('wt-join-btn');
+                if (joinBtn) {
+                    joinBtn.textContent = '⏳ Buffering…';
+                    joinBtn.disabled = true;
+                    joinBtn.style.display = '';
+                }
+
+                // Wait for canplay — then the browser has enough data to start playback
+                const media = this.audioPlayer.media;
+                const onCanPlay = () => {
+                    media.removeEventListener('canplay', onCanPlay);
+                    const btn = document.getElementById('wt-join-btn');
+                    if (btn && btn.textContent.includes('Buffering')) {
+                        btn.textContent = '▶ Tap to Watch';
+                        btn.disabled = false;
+                    }
+                };
+                media.addEventListener('canplay', onCanPlay);
+                // Safety fallback — enable after 8s even if canplay never fires
+                setTimeout(() => {
+                    media.removeEventListener('canplay', onCanPlay);
+                    const btn = document.getElementById('wt-join-btn');
+                    if (btn && btn.textContent.includes('Buffering')) {
+                        btn.textContent = '▶ Tap to Watch';
+                        btn.disabled = false;
+                    }
+                }, 8000);
 
                 if (wasNone) {
                     this.showToast(`🎬 "${this._wtStripExtension(filename)}" — tap Watch to join`, 'info');
@@ -426,10 +447,14 @@ class RoomSocketManager {
                 if (ap.videoContainer) ap.videoContainer.classList.add('is-playing');
                 // Attempt to play — may be blocked by autoplay policy until user taps
                 media.play().catch(() => {
-                    // Browser blocked autoplay — guest must tap "Tap to Join" button
-                    // Show the button prominently if it's been hidden
+                    // Browser blocked autoplay — seek to correct position so guest
+                    // starts from the right place when they tap the join button.
+                    ap.isSyncing = true;
+                    media.currentTime = adjusted;
+                    setTimeout(() => { ap.isSyncing = false; }, 100);
+                    // Re-show the join button
                     const btn = document.getElementById('wt-join-btn');
-                    if (btn) { btn.disabled = false; btn.textContent = '▶ Tap to Watch'; }
+                    if (btn) { btn.disabled = false; btn.textContent = '▶ Tap to Watch'; btn.style.display = ''; }
                 });
             }
             if (!isPlaying && !media.paused) {
@@ -1009,15 +1034,29 @@ class RoomSocketManager {
             this.wtJoinBtn.textContent = 'Syncing…';
             this.wtJoinBtn.disabled = true;
         }
-        // Request current state from server — this is the user-gesture context
+
+        const ap = this.audioPlayer;
+        const media = ap.media;
+
+        // Ask server for the live current time.
+        // The response comes back as session-playback-state which seeks + plays.
+        // We also attempt to play right here while we're still inside the user-gesture
+        // call stack — this is the only moment the browser allows autoplay.
         this.socket.emit('sync-request');
-        // Attempt to play immediately as we are now in a user-gesture stack
+
         try {
-            await this.audioPlayer.media.play();
-        } catch (e) {
-            // If it fails, syncPlayback from session-playback-state will retry
+            await media.play();
+        } catch {
+            // Autoplay still blocked — session-playback-state will retry when it arrives.
+            // Re-enable button so guest can try again.
+            if (this.wtJoinBtn) {
+                this.wtJoinBtn.textContent = '▶ Tap to Watch';
+                this.wtJoinBtn.disabled = false;
+            }
+            return;
         }
-        // Hide the button — guest is now watching
+
+        // Playback started — hide the button
         if (this.wtJoinBtn) this.wtJoinBtn.style.display = 'none';
         this.showToast('Synced! Enjoy 🍿', 'success');
     }
