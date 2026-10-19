@@ -1564,3 +1564,23 @@
     .wt-upload-area { padding: 16px 12px; }
     .wt-loaded { padding: 12px; }
 }
+
+/* ── Watch Together — Join button (guest autoplay unlock) ── */
+.wt-join-btn {
+    width: 100%;
+    margin-top: 12px;
+    justify-content: center;
+    background: linear-gradient(135deg, hsl(270,80%,55%), hsl(300,70%,55%));
+    border: none;
+    color: #fff;
+    font-weight: 700;
+    font-size: .84rem;
+    padding: 10px 0;
+    border-radius: var(--r-md);
+    cursor: pointer;
+    transition: filter var(--fast), transform var(--fast);
+    display: flex; align-items: center; gap: 6px;
+    -webkit-tap-highlight-color: transparent;
+}
+.wt-join-btn:hover  { filter: brightness(1.15); transform: translateY(-1px); }
+.wt-join-btn:active { transform: scale(.97); }

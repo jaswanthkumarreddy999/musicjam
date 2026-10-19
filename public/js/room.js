@@ -125,6 +125,7 @@ class RoomSocketManager {
         this.wtEndBtn         = document.getElementById('wt-end-btn');
         this.wtGuestWaiting   = document.getElementById('wt-guest-waiting');
         this.wtGuestFilename  = document.getElementById('wt-guest-filename');
+        this.wtJoinBtn        = document.getElementById('wt-join-btn');
         this.wtFormatWarn     = document.getElementById('wt-format-warn');
         this.wtJoinBtn        = document.getElementById('wt-join-btn');
         // Watch Together state
@@ -259,6 +260,10 @@ class RoomSocketManager {
         }
         if (this.wtEndBtn) {
             this.wtEndBtn.addEventListener('click', () => this.endWatchSession());
+        }
+        // Guest join button — acts as the required user gesture for autoplay
+        if (this.wtJoinBtn) {
+            this.wtJoinBtn.addEventListener('click', () => this._wtGuestJoin());
         }
         // Guest "Tap to Join" — provides the user gesture needed to unlock autoplay
         const wtJoinBtn = document.getElementById('wt-join-btn');
@@ -476,6 +481,12 @@ class RoomSocketManager {
         this.socket.on('session-video-ended', () => {
             this.wtSessionVideoId = null;
             this.audioPlayer.reset();
+            // Reset join button for the next session
+            if (this.wtJoinBtn) {
+                this.wtJoinBtn.style.display = '';
+                this.wtJoinBtn.textContent = '▶ Tap to Join & Sync';
+                this.wtJoinBtn.disabled = false;
+            }
             if (this.wtMode === 'guest') {
                 this._wtShowState('idle');
                 this.showToast('Watch Together session ended by host', 'info');
@@ -1022,6 +1033,25 @@ class RoomSocketManager {
         this._wtShowState('idle');
         if (this.wtFormatWarn) this.wtFormatWarn.style.display = 'none';
         this.showToast('Watch Together session ended — file deleted', 'success');
+    }
+
+    /* ── Guest: user taps "Join & Sync" — unlocks autoplay then syncs ── */
+    async _wtGuestJoin() {
+        if (this.wtJoinBtn) {
+            this.wtJoinBtn.textContent = 'Syncing…';
+            this.wtJoinBtn.disabled = true;
+        }
+        // Request current state from server — this is the user-gesture context
+        this.socket.emit('sync-request');
+        // Attempt to play immediately as we are now in a user-gesture stack
+        try {
+            await this.audioPlayer.media.play();
+        } catch (e) {
+            // If it fails, syncPlayback from session-playback-state will retry
+        }
+        // Hide the button — guest is now watching
+        if (this.wtJoinBtn) this.wtJoinBtn.style.display = 'none';
+        this.showToast('Synced! Enjoy 🍿', 'success');
     }
 
     /* ── Share modal ── */
