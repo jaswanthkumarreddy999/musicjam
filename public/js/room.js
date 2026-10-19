@@ -468,7 +468,7 @@ class RoomSocketManager {
                 if (ap.vcPlayIcon2)  ap.vcPlayIcon2.classList.remove('hidden');
                 if (ap.vcPauseIcon2) ap.vcPauseIcon2.classList.add('hidden');
                 if (ap.videoContainer) ap.videoContainer.classList.remove('is-playing');
-                if (ap.currentMediaType === 'video') ap._showOverlay();
+                if (typeof ap._showOverlay === 'function') ap._showOverlay();
             }
         });
 
@@ -631,6 +631,8 @@ class RoomSocketManager {
     }
 
     handlePlaybackState(data) {
+        // Don't let music playback-state interfere while a session video is active
+        if (this.wtSessionVideoId) return;
         if (data.currentSong) {
             if (this.roomData) this.roomData.currentSong = data.currentSong;
             this.audioPlayer.loadSong(data.currentSong);
