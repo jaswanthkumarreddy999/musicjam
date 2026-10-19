@@ -1516,37 +1516,44 @@
 .wt-guest-waiting {
     padding: 20px 16px;
     text-align: center;
+    display: flex; flex-direction: column; gap: 10px;
 }
 
-.wt-guest-icon { font-size: 2rem; margin-bottom: 8px; }
+.wt-guest-icon { font-size: 2rem; line-height: 1; }
 
 .wt-guest-title {
     font-size: .86rem; font-weight: 700; color: var(--txt);
-    margin-bottom: 4px;
 }
 
 .wt-guest-sub {
-    font-size: .76rem; color: hsl(270,60%,72%);
+    font-size: .78rem; color: hsl(270,60%,78%);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     max-width: 100%;
-    margin-bottom: 12px;
+    font-weight: 600;
 }
 
 .wt-join-btn {
     width: 100%;
     justify-content: center;
-    background: hsla(270,80%,60%,.2);
-    border: 1px solid hsla(270,80%,60%,.5);
-    color: hsl(270,80%,85%);
+    background: hsla(270,80%,60%,.25);
+    border: 1px solid hsla(270,80%,60%,.6);
+    color: hsl(270,80%,90%);
     font-weight: 700;
+    font-size: .85rem;
+    padding: 10px 14px;
     transition: all var(--fast);
     display: inline-flex; align-items: center; gap: 6px;
+    box-shadow: 0 0 12px hsla(270,80%,60%,.15);
 }
 .wt-join-btn:hover {
-    background: hsla(270,80%,60%,.35);
+    background: hsla(270,80%,60%,.4);
     border-color: hsl(270,80%,75%);
     color: #fff;
-    box-shadow: 0 0 14px hsla(270,80%,60%,.3);
+    box-shadow: 0 0 20px hsla(270,80%,60%,.35);
+    transform: translateY(-1px);
+}
+.wt-join-btn:disabled {
+    opacity: .6; cursor: default; transform: none;
 }
 
 /* ── Responsive ── */

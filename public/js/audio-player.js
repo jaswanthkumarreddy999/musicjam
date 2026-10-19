@@ -353,6 +353,16 @@ class AudioPlayer {
         const fallback = document.getElementById('video-audio-fallback');
         const audioPlayerEl = document.getElementById('audio-player');
 
+        // Session videos (Watch Together) are always real video files —
+        // never fall back to audio-player controls for them, even while buffering.
+        if (this.isSessionVideo) {
+            video.style.opacity = '1';
+            video.style.pointerEvents = 'auto';
+            if (fallback) { fallback.style.zIndex = '0'; fallback.style.display = 'none'; }
+            if (audioPlayerEl) audioPlayerEl.classList.add('hidden');
+            return;
+        }
+
         // videoWidth > 0 means real video frames exist
         // videoTracks API is more reliable but not supported everywhere
         const hasVideo = (video.videoWidth > 0)

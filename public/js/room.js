@@ -263,14 +263,31 @@ class RoomSocketManager {
         const wtJoinBtn = document.getElementById('wt-join-btn');
         if (wtJoinBtn) {
             wtJoinBtn.addEventListener('click', () => {
-                // Request a fresh sync from the server — server will send session-playback-state
+                const ap = this.audioPlayer;
+                if (!ap) return;
+
+                // 1. Play immediately — this click IS the user gesture,
+                //    so media.play() must be called synchronously here.
+                const media = ap.media;
+                if (media && media.src) {
+                    // Update UI icons
+                    if (ap.playIcon)  ap.playIcon.classList.add('hidden');
+                    if (ap.pauseIcon) ap.pauseIcon.classList.remove('hidden');
+                    if (ap.vcPlayIcon)  ap.vcPlayIcon.classList.add('hidden');
+                    if (ap.vcPauseIcon) ap.vcPauseIcon.classList.remove('hidden');
+                    if (ap.vcPlayIcon2)  ap.vcPlayIcon2.classList.add('hidden');
+                    if (ap.vcPauseIcon2) ap.vcPauseIcon2.classList.remove('hidden');
+                    if (ap.videoContainer) ap.videoContainer.classList.add('is-playing');
+                    media.play().catch(() => {});
+                }
+
+                // 2. Ask server for current position to sync
                 this.socket.emit('sync-request');
-                wtJoinBtn.textContent = '⏳ Syncing…';
+
+                // 3. Update button state
+                wtJoinBtn.textContent = '✓ Joined';
                 wtJoinBtn.disabled = true;
-                setTimeout(() => {
-                    wtJoinBtn.textContent = '▶ Tap to Join & Sync';
-                    wtJoinBtn.disabled = false;
-                }, 3000);
+                wtJoinBtn.style.background = 'hsla(270,80%,60%,.25)';
             });
         }
     }
@@ -382,15 +399,23 @@ class RoomSocketManager {
                 // Host: update the loaded panel with probed duration from server
                 this._wtUpdateLoadedPanel(filename, duration);
             } else {
-                // Guest: open the WT zone and show the guest panel
-                if (this.wtZone) {
-                    this.wtZone.classList.remove('hidden');
-                    if (this.wtToggleBtn) this.wtToggleBtn.classList.add('wt-active');
+                // Guest: force open the WT zone and show the guest panel
+                if (this.wtZone) this.wtZone.classList.remove('hidden');
+                if (this.wtToggleBtn) this.wtToggleBtn.classList.add('wt-active');
+
+                // Reset join button so guest can always tap it
+                const joinBtn = document.getElementById('wt-join-btn');
+                if (joinBtn) {
+                    joinBtn.textContent = '▶ Tap to Watch';
+                    joinBtn.disabled = false;
+                    joinBtn.style.background = '';
                 }
+
                 this._wtShowState('guest');
                 if (this.wtGuestFilename) this.wtGuestFilename.textContent = filename;
+
                 if (wasNone) {
-                    this.showToast(`🎬 Watch Together started: ${this._wtStripExtension(filename)}`, 'info');
+                    this.showToast(`🎬 "${this._wtStripExtension(filename)}" — tap Watch to join`, 'info');
                 }
             }
         });
@@ -408,17 +433,41 @@ class RoomSocketManager {
             const lag = (Date.now() - timestamp) / 1000;
             const adjusted = isPlaying ? currentTime + lag : currentTime;
 
-            // Seek if drift > 1s
+            // Seek if drift > 1s — call directly on media, no socket
             if (Math.abs(media.currentTime - adjusted) > ap.syncThreshold) {
-                ap.seek(adjusted); // AudioPlayer.seek() — touches media directly, no socket
+                ap.isSyncing = true;
+                media.currentTime = adjusted;
+                setTimeout(() => { ap.isSyncing = false; }, 100);
             }
 
-            // Play/pause directly on the media element — no socket emission
+            // Play/pause directly on media — update UI icons but DO NOT emit sockets
             if (isPlaying && media.paused) {
-                ap.play(); // AudioPlayer.play() — calls media.play() + updates UI only
+                // Update icons
+                if (ap.playIcon)  ap.playIcon.classList.add('hidden');
+                if (ap.pauseIcon) ap.pauseIcon.classList.remove('hidden');
+                if (ap.vcPlayIcon)  ap.vcPlayIcon.classList.add('hidden');
+                if (ap.vcPauseIcon) ap.vcPauseIcon.classList.remove('hidden');
+                if (ap.vcPlayIcon2)  ap.vcPlayIcon2.classList.add('hidden');
+                if (ap.vcPauseIcon2) ap.vcPauseIcon2.classList.remove('hidden');
+                if (ap.videoContainer) ap.videoContainer.classList.add('is-playing');
+                // Attempt to play — may be blocked by autoplay policy until user taps
+                media.play().catch(() => {
+                    // Browser blocked autoplay — guest must tap "Tap to Join" button
+                    // Show the button prominently if it's been hidden
+                    const btn = document.getElementById('wt-join-btn');
+                    if (btn) { btn.disabled = false; btn.textContent = '▶ Tap to Watch'; }
+                });
             }
             if (!isPlaying && !media.paused) {
-                ap.pause(); // AudioPlayer.pause() — calls media.pause() + updates UI only
+                media.pause();
+                if (ap.playIcon)  ap.playIcon.classList.remove('hidden');
+                if (ap.pauseIcon) ap.pauseIcon.classList.add('hidden');
+                if (ap.vcPlayIcon)  ap.vcPlayIcon.classList.remove('hidden');
+                if (ap.vcPauseIcon) ap.vcPauseIcon.classList.add('hidden');
+                if (ap.vcPlayIcon2)  ap.vcPlayIcon2.classList.remove('hidden');
+                if (ap.vcPauseIcon2) ap.vcPauseIcon2.classList.add('hidden');
+                if (ap.videoContainer) ap.videoContainer.classList.remove('is-playing');
+                if (ap.currentMediaType === 'video') ap._showOverlay();
             }
         });
 
