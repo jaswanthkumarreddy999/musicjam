@@ -127,7 +127,6 @@ class RoomSocketManager {
         this.wtGuestFilename  = document.getElementById('wt-guest-filename');
         this.wtJoinBtn        = document.getElementById('wt-join-btn');
         this.wtFormatWarn     = document.getElementById('wt-format-warn');
-        this.wtJoinBtn        = document.getElementById('wt-join-btn');
         // Watch Together state
         this.wtSessionVideoId = null;
         this.wtMode           = 'none'; // 'none' | 'host' | 'guest'
@@ -264,37 +263,6 @@ class RoomSocketManager {
         // Guest join button — acts as the required user gesture for autoplay
         if (this.wtJoinBtn) {
             this.wtJoinBtn.addEventListener('click', () => this._wtGuestJoin());
-        }
-        // Guest "Tap to Join" — provides the user gesture needed to unlock autoplay
-        const wtJoinBtn = document.getElementById('wt-join-btn');
-        if (wtJoinBtn) {
-            wtJoinBtn.addEventListener('click', () => {
-                const ap = this.audioPlayer;
-                if (!ap) return;
-
-                // 1. Play immediately — this click IS the user gesture,
-                //    so media.play() must be called synchronously here.
-                const media = ap.media;
-                if (media && media.src) {
-                    // Update UI icons
-                    if (ap.playIcon)  ap.playIcon.classList.add('hidden');
-                    if (ap.pauseIcon) ap.pauseIcon.classList.remove('hidden');
-                    if (ap.vcPlayIcon)  ap.vcPlayIcon.classList.add('hidden');
-                    if (ap.vcPauseIcon) ap.vcPauseIcon.classList.remove('hidden');
-                    if (ap.vcPlayIcon2)  ap.vcPlayIcon2.classList.add('hidden');
-                    if (ap.vcPauseIcon2) ap.vcPauseIcon2.classList.remove('hidden');
-                    if (ap.videoContainer) ap.videoContainer.classList.add('is-playing');
-                    media.play().catch(() => {});
-                }
-
-                // 2. Ask server for current position to sync
-                this.socket.emit('sync-request');
-
-                // 3. Update button state
-                wtJoinBtn.textContent = '✓ Joined';
-                wtJoinBtn.disabled = true;
-                wtJoinBtn.style.background = 'hsla(270,80%,60%,.25)';
-            });
         }
     }
 
