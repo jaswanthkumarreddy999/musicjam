@@ -1534,6 +1534,7 @@
 
 .wt-join-btn {
     width: 100%;
+    margin-top: 10px;
     justify-content: center;
     background: hsla(270,80%,60%,.25);
     border: 1px solid hsla(270,80%,60%,.6);
@@ -1562,28 +1563,4 @@
     .btn-watch { padding: 6px 8px; font-size: .76rem; }
     .wt-upload-area { padding: 16px 12px; }
     .wt-loaded { padding: 12px; }
-}
-
-/* ── Watch Together: guest "Tap to Join" button ── */
-.wt-join-btn {
-    width: 100%;
-    margin-top: 10px;
-    justify-content: center;
-    background: hsla(270,80%,60%,.2);
-    border: 1px solid hsla(270,80%,60%,.5);
-    color: hsl(270,80%,88%);
-    font-size: .82rem; font-weight: 700;
-    padding: 9px 16px;
-    transition: all var(--fast);
-    display: inline-flex; align-items: center; gap: 6px;
-    cursor: pointer;
-}
-.wt-join-btn:hover:not(:disabled) {
-    background: hsla(270,80%,60%,.35);
-    border-color: hsl(270,80%,75%);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 16px hsla(270,80%,60%,.3);
-}
-.wt-join-btn:disabled {
-    opacity: .55; cursor: default; transform: none;
 }

@@ -1347,7 +1347,10 @@ io.on('connection', (socket) => {
     }
 
     // Store on room so late-joiners can receive it via sync-request
-    room.sessionVideo = { videoId, filename, duration };
+    // Use the ffprobe-measured duration from the upload, not the client-provided value
+    const sessionMeta = sessionVideos.get(videoId);
+    const realDuration = sessionMeta ? sessionMeta.duration : (duration || 0);
+    room.sessionVideo = { videoId, filename, duration: realDuration };
     room.sessionIsPlaying = false;
     room.sessionCurrentTime = 0;
     room.sessionLastUpdate = Date.now();
@@ -1356,7 +1359,7 @@ io.on('connection', (socket) => {
     io.to(socket.currentRoom).emit('session-video-loaded', {
       videoId,
       filename,
-      duration
+      duration: realDuration
     });
     console.log(`🎬 Session video loaded in room ${socket.currentRoom}: ${filename}`);
   });
