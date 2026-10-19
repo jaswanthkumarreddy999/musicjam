@@ -126,6 +126,7 @@ class RoomSocketManager {
         this.wtGuestWaiting   = document.getElementById('wt-guest-waiting');
         this.wtGuestFilename  = document.getElementById('wt-guest-filename');
         this.wtFormatWarn     = document.getElementById('wt-format-warn');
+        this.wtJoinBtn        = document.getElementById('wt-join-btn');
         // Watch Together state
         this.wtSessionVideoId = null;
         this.wtMode           = 'none'; // 'none' | 'host' | 'guest'
