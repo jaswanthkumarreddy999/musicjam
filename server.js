@@ -109,6 +109,116 @@ const songs = new Map();
 const users = new Map(); // socketId -> { userId, roomCode, nickname, color }
 const transcodeJobs = new Map(); // jobId -> { status: 'transcoding' | 'uploading' | 'completed' | 'failed', progress: 0, song: null, error: null }
 
+// ── Session (ephemeral) videos — Watch Together ────────────────
+// videoId -> { filePath, filename, size, duration, mimeType, uploadedAt, roomCode }
+const sessionVideos = new Map();
+
+const sessionUpload = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => cb(null, uploadDir),
+    filename: (req, file, cb) =>
+      cb(null, `session-${Date.now()}-${uuidv4().slice(0, 8)}${path.extname(file.originalname)}`)
+  }),
+  limits: { fileSize: 900 * 1024 * 1024 }, // 900 MB — nearly the full 1 GB temp disk
+  fileFilter: (req, file, cb) => {
+    const name = file.originalname.toLowerCase();
+    const ok = VIDEO_EXTS.test(name) || VIDEO_MIME.includes(file.mimetype);
+    ok ? cb(null, true) : cb(new Error(`Unsupported video type: ${file.mimetype}`));
+  }
+});
+
+async function deleteSessionVideo(videoId) {
+  const v = sessionVideos.get(videoId);
+  if (!v) return;
+  await fs.unlink(v.filePath).catch(e => console.warn('Session video unlink warning:', e.message));
+  sessionVideos.delete(videoId);
+  console.log(`🗑️  Session video deleted: ${v.filename}`);
+}
+
+// Upload a session video (no Cloudinary, no transcoding — direct disk stream)
+app.post('/api/session-upload', sessionUpload.single('video'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ success: false, message: 'No file provided' });
+
+  // Probe duration
+  const duration = await new Promise(resolve => {
+    ffmpeg.ffprobe(req.file.path, (err, meta) =>
+      resolve(err ? 0 : (meta?.format?.duration || 0))
+    );
+  });
+
+  const videoId = uuidv4();
+  const mimeType = req.file.mimetype.startsWith('video/') ? req.file.mimetype : 'video/mp4';
+
+  sessionVideos.set(videoId, {
+    filePath: req.file.path,
+    filename: req.file.originalname,
+    size: req.file.size,
+    duration,
+    mimeType,
+    uploadedAt: Date.now(),
+    roomCode: req.body.roomCode || null
+  });
+
+  // Auto-delete after 6 hours regardless
+  setTimeout(() => deleteSessionVideo(videoId), 6 * 60 * 60 * 1000);
+
+  console.log(`🎬 Session video uploaded: ${req.file.originalname} (${(req.file.size / 1024 / 1024).toFixed(1)} MB, ${duration.toFixed(1)}s) → ${videoId}`);
+
+  res.json({
+    success: true,
+    video: {
+      id: videoId,
+      filename: req.file.originalname,
+      duration,
+      size: req.file.size
+    }
+  });
+});
+
+// Stream session video with HTTP range support (required for browser seeking)
+app.get('/api/session-video/:videoId', (req, res) => {
+  const v = sessionVideos.get(req.params.videoId);
+  if (!v) return res.status(404).json({ success: false, message: 'Session video not found or expired' });
+
+  let stat;
+  try { stat = fsSync.statSync(v.filePath); } catch {
+    sessionVideos.delete(req.params.videoId);
+    return res.status(404).json({ success: false, message: 'File missing from disk' });
+  }
+
+  const fileSize = stat.size;
+  const range = req.headers.range;
+  const mimeType = v.mimeType || 'video/mp4';
+
+  if (range) {
+    const parts = range.replace(/bytes=/, '').split('-');
+    const start = parseInt(parts[0], 10);
+    const end   = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+    const chunkSize = end - start + 1;
+
+    res.writeHead(206, {
+      'Content-Range':  `bytes ${start}-${end}/${fileSize}`,
+      'Accept-Ranges':  'bytes',
+      'Content-Length': chunkSize,
+      'Content-Type':   mimeType,
+    });
+    fsSync.createReadStream(v.filePath, { start, end }).pipe(res);
+  } else {
+    res.writeHead(200, {
+      'Content-Length': fileSize,
+      'Content-Type':   mimeType,
+      'Accept-Ranges':  'bytes',
+    });
+    fsSync.createReadStream(v.filePath).pipe(res);
+  }
+});
+
+// Delete session video manually (e.g. host ends session)
+app.delete('/api/session-video/:videoId', async (req, res) => {
+  await deleteSessionVideo(req.params.videoId);
+  res.json({ success: true });
+});
+
 // ── Persistent song metadata — backed by Cloudinary raw asset ──
 const SONGS_DB_PUBLIC_ID = 'musicjam/songs-db';
 
@@ -994,6 +1104,23 @@ io.on('connection', (socket) => {
       hasPrev: room.history.length > 0,
       history: room.history.slice(-10).reverse()
     });
+
+    // Also send session video state if active
+    if (room.sessionVideo) {
+      const liveTime = room.sessionIsPlaying
+        ? room.sessionCurrentTime + (Date.now() - room.sessionLastUpdate) / 1000
+        : room.sessionCurrentTime;
+      socket.emit('session-video-loaded', {
+        videoId: room.sessionVideo.videoId,
+        filename: room.sessionVideo.filename,
+        duration: room.sessionVideo.duration
+      });
+      socket.emit('session-playback-state', {
+        isPlaying: room.sessionIsPlaying,
+        currentTime: liveTime,
+        timestamp: Date.now()
+      });
+    }
   });
   
   socket.on('add-to-queue', (data) => {
@@ -1204,6 +1331,83 @@ io.on('connection', (socket) => {
       autoRequeue: room.autoRequeue,
       noDuplicates: room.noDuplicates
     });
+  });
+
+  // ── Watch Together — session video sync ──────────────────────
+  // Host loads a session video → broadcast its ID to the whole room
+  socket.on('session-video-load', (data) => {
+    const { videoId, filename, duration } = data;
+    const room = rooms.get(socket.currentRoom);
+    if (!room) return;
+
+    // Verify video exists on disk
+    if (!sessionVideos.has(videoId)) {
+      socket.emit('error', { message: 'Session video not found' });
+      return;
+    }
+
+    // Store on room so late-joiners can receive it via sync-request
+    room.sessionVideo = { videoId, filename, duration };
+    room.sessionIsPlaying = false;
+    room.sessionCurrentTime = 0;
+    room.sessionLastUpdate = Date.now();
+
+    // Tell everyone in the room (including the host)
+    io.to(socket.currentRoom).emit('session-video-loaded', {
+      videoId,
+      filename,
+      duration
+    });
+    console.log(`🎬 Session video loaded in room ${socket.currentRoom}: ${filename}`);
+  });
+
+  socket.on('session-video-play', () => {
+    const room = rooms.get(socket.currentRoom);
+    if (!room || !room.sessionVideo) return;
+    room.sessionIsPlaying = true;
+    room.sessionLastUpdate = Date.now();
+    io.to(socket.currentRoom).emit('session-playback-state', {
+      isPlaying: true,
+      currentTime: room.sessionCurrentTime,
+      timestamp: Date.now()
+    });
+  });
+
+  socket.on('session-video-pause', () => {
+    const room = rooms.get(socket.currentRoom);
+    if (!room || !room.sessionVideo) return;
+    if (room.sessionIsPlaying) {
+      room.sessionCurrentTime += (Date.now() - room.sessionLastUpdate) / 1000;
+    }
+    room.sessionIsPlaying = false;
+    room.sessionLastUpdate = Date.now();
+    io.to(socket.currentRoom).emit('session-playback-state', {
+      isPlaying: false,
+      currentTime: room.sessionCurrentTime,
+      timestamp: Date.now()
+    });
+  });
+
+  socket.on('session-video-seek', (data) => {
+    const { time } = data;
+    const room = rooms.get(socket.currentRoom);
+    if (!room || !room.sessionVideo) return;
+    room.sessionCurrentTime = time;
+    room.sessionLastUpdate = Date.now();
+    io.to(socket.currentRoom).emit('session-playback-state', {
+      isPlaying: room.sessionIsPlaying,
+      currentTime: time,
+      timestamp: Date.now()
+    });
+  });
+
+  socket.on('session-video-end', () => {
+    const room = rooms.get(socket.currentRoom);
+    if (!room) return;
+    room.sessionVideo = null;
+    room.sessionIsPlaying = false;
+    room.sessionCurrentTime = 0;
+    io.to(socket.currentRoom).emit('session-video-ended', {});
   });
 
   socket.on('disconnect', () => {

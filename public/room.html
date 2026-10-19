@@ -251,8 +251,71 @@
                     <section class="library-panel">
                         <div class="library-panel-header">
                             <h3>Library</h3>
-                            <button id="room-upload-btn" class="btn btn-primary btn-small">⬆ Upload</button>
+                            <div class="library-header-btns">
+                                <button id="wt-toggle-btn" class="btn btn-watch btn-small" title="Watch Together — stream a movie/anime in sync">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>
+                                    </svg>
+                                    Watch
+                                </button>
+                                <button id="room-upload-btn" class="btn btn-primary btn-small">⬆ Upload</button>
+                            </div>
                         </div>
+
+                        <!-- ── Watch Together zone (hidden by default) ── -->
+                        <div id="wt-zone" class="wt-zone hidden">
+
+                            <!-- State: idle — drop/pick a video file -->
+                            <div id="wt-idle" class="wt-idle">
+                                <div class="wt-upload-area" id="wt-upload-area">
+                                    <div class="wt-upload-icon">🎬</div>
+                                    <p class="wt-upload-title">Drop a movie or anime episode</p>
+                                    <p class="wt-upload-hint">MP4 · MKV · WebM · MOV · AVI<br>
+                                        <span class="wt-hint-note">Original quality · No transcoding · Up to 900 MB</span>
+                                    </p>
+                                    <p class="wt-format-warn" id="wt-format-warn" style="display:none;">
+                                        ⚠️ MKV may not play in Chrome/Firefox.<br>Remux to MP4 for best compatibility.
+                                    </p>
+                                </div>
+                                <input type="file" id="wt-file-input" accept="video/mp4,video/webm,video/quicktime,video/x-matroska,video/x-msvideo,.mkv,.avi" style="display:none;">
+                                <div id="wt-upload-progress" class="wt-upload-progress hidden">
+                                    <div class="wt-progress-track">
+                                        <div class="wt-progress-fill" id="wt-progress-fill"></div>
+                                    </div>
+                                    <p class="wt-progress-text" id="wt-progress-text">Uploading…</p>
+                                </div>
+                            </div>
+
+                            <!-- State: loaded — video ready, controls shown -->
+                            <div id="wt-loaded" class="wt-loaded hidden">
+                                <div class="wt-info-row">
+                                    <div class="wt-film-icon">🎬</div>
+                                    <div class="wt-info-text">
+                                        <p class="wt-filename" id="wt-filename">filename.mp4</p>
+                                        <p class="wt-meta" id="wt-meta">Loading…</p>
+                                    </div>
+                                </div>
+                                <div class="wt-status-row">
+                                    <span class="wt-live-badge">
+                                        <span class="wt-live-dot"></span>
+                                        LIVE SESSION
+                                    </span>
+                                    <span class="wt-viewer-count" id="wt-viewer-count">2 watching</span>
+                                </div>
+                                <button id="wt-end-btn" class="btn wt-end-btn btn-small">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                    End Session
+                                </button>
+                            </div>
+
+                            <!-- State: guest waiting — video loaded by host, guest sees it automatically -->
+                            <div id="wt-guest-waiting" class="wt-guest-waiting hidden">
+                                <div class="wt-guest-icon">🍿</div>
+                                <p class="wt-guest-title">Session started by host</p>
+                                <p class="wt-guest-sub" id="wt-guest-filename">Loading video…</p>
+                            </div>
+
+                        </div><!-- /wt-zone -->
 
                         <!-- Upload zone (hidden by default) -->
                         <div id="room-upload-zone" class="room-upload-zone hidden">

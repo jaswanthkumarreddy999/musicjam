@@ -109,6 +109,26 @@ class RoomSocketManager {
         // Toggles
         this.autoRequeueBtn = document.getElementById('auto-requeue-btn');
         this.noDuplicatesBtn = document.getElementById('no-duplicates-btn');
+        // Watch Together
+        this.wtToggleBtn      = document.getElementById('wt-toggle-btn');
+        this.wtZone           = document.getElementById('wt-zone');
+        this.wtIdle           = document.getElementById('wt-idle');
+        this.wtUploadArea     = document.getElementById('wt-upload-area');
+        this.wtFileInput      = document.getElementById('wt-file-input');
+        this.wtUploadProgress = document.getElementById('wt-upload-progress');
+        this.wtProgressFill   = document.getElementById('wt-progress-fill');
+        this.wtProgressText   = document.getElementById('wt-progress-text');
+        this.wtLoaded         = document.getElementById('wt-loaded');
+        this.wtFilename       = document.getElementById('wt-filename');
+        this.wtMeta           = document.getElementById('wt-meta');
+        this.wtViewerCount    = document.getElementById('wt-viewer-count');
+        this.wtEndBtn         = document.getElementById('wt-end-btn');
+        this.wtGuestWaiting   = document.getElementById('wt-guest-waiting');
+        this.wtGuestFilename  = document.getElementById('wt-guest-filename');
+        this.wtFormatWarn     = document.getElementById('wt-format-warn');
+        // Watch Together state
+        this.wtSessionVideoId = null;
+        this.wtMode           = 'none'; // 'none' | 'host' | 'guest'
 
         if (this.roomCodeDisplay) this.roomCodeDisplay.textContent = this.roomCode;
     }
@@ -206,6 +226,39 @@ class RoomSocketManager {
                 }
             });
         }
+
+        // ── Watch Together ──────────────────────────────────────
+        if (this.wtToggleBtn) {
+            this.wtToggleBtn.addEventListener('click', () => this.toggleWatchTogether());
+        }
+        if (this.wtUploadArea) {
+            this.wtUploadArea.addEventListener('click', () => this.wtFileInput && this.wtFileInput.click());
+            this.wtUploadArea.addEventListener('dragover', e => {
+                e.preventDefault();
+                this.wtUploadArea.classList.add('dragover');
+            });
+            this.wtUploadArea.addEventListener('dragleave', () => {
+                this.wtUploadArea.classList.remove('dragover');
+            });
+            this.wtUploadArea.addEventListener('drop', e => {
+                e.preventDefault();
+                this.wtUploadArea.classList.remove('dragover');
+                const files = Array.from(e.dataTransfer.files).filter(f =>
+                    f.type.startsWith('video/') ||
+                    /\.(mp4|webm|mov|mkv|avi)$/i.test(f.name)
+                );
+                if (files.length) this.uploadSessionVideo(files[0]);
+                else this.showToast('Please drop a video file', 'error');
+            });
+        }
+        if (this.wtFileInput) {
+            this.wtFileInput.addEventListener('change', e => {
+                if (e.target.files[0]) this.uploadSessionVideo(e.target.files[0]);
+            });
+        }
+        if (this.wtEndBtn) {
+            this.wtEndBtn.addEventListener('click', () => this.endWatchSession());
+        }
     }
 
     generateUserId() {
@@ -282,6 +335,69 @@ class RoomSocketManager {
             this.showToast('Room deleted by host', 'error');
             setTimeout(() => { window.location.href = '/'; }, 3000);
         });
+
+        // ── Watch Together socket events ─────────────────────────
+        // A session video was loaded by the host — everyone loads it
+        this.socket.on('session-video-loaded', data => {
+            const { videoId, filename, duration } = data;
+            this.wtSessionVideoId = videoId;
+            // Load into the player as a direct-URL video (no HLS, no Cloudinary)
+            const fakeSessionSong = {
+                id: `session-${videoId}`,
+                title: this._wtStripExtension(filename),
+                artist: 'Watch Together Session',
+                album: '',
+                duration,
+                mediaType: 'video',
+                url: `/api/session-video/${videoId}`,
+                path: `/api/session-video/${videoId}`,
+                isHLS: false,
+                isSession: true
+            };
+            this.audioPlayer.loadSong(fakeSessionSong);
+
+            if (this.wtMode === 'guest') {
+                // Guest: show the guest-waiting panel with filename
+                this._wtShowState('guest');
+                if (this.wtGuestFilename) this.wtGuestFilename.textContent = filename;
+            } else if (this.wtMode === 'host') {
+                // Host: update the loaded panel with probed duration from server
+                this._wtUpdateLoadedPanel(filename, duration);
+            } else {
+                // Someone else's session started — make us a guest and open the WT zone
+                this.wtMode = 'guest';
+                if (this.wtZone) {
+                    this.wtZone.classList.remove('hidden');
+                    this.wtToggleBtn.classList.add('wt-active');
+                }
+                this._wtShowState('guest');
+                if (this.wtGuestFilename) this.wtGuestFilename.textContent = filename;
+                this.showToast(`🎬 Watch Together started: ${this._wtStripExtension(filename)}`, 'info');
+            }
+        });
+
+        // Playback state for session video (play/pause/seek synced separately)
+        this.socket.on('session-playback-state', data => {
+            const { isPlaying, currentTime, timestamp } = data;
+            // Compute lag-corrected time
+            const lag = (Date.now() - timestamp) / 1000;
+            const corrected = isPlaying ? currentTime + lag : currentTime;
+            this.audioPlayer.syncPlayback(corrected, isPlaying, timestamp);
+        });
+
+        // Session ended by host
+        this.socket.on('session-video-ended', () => {
+            this.wtSessionVideoId = null;
+            this.audioPlayer.reset();
+            if (this.wtMode === 'guest') {
+                this._wtShowState('idle');
+                this.showToast('Watch Together session ended by host', 'info');
+            }
+            if (this.wtMode === 'host') {
+                this._wtShowState('idle');
+            }
+            this.wtMode = 'none';
+        });
     }
 
     joinRoom() {
@@ -303,6 +419,8 @@ class RoomSocketManager {
 
     updateUserCount(count) {
         if (this.userCount) this.userCount.textContent = count;
+        // Keep WT viewer count fresh
+        if (this.wtSessionVideoId) this._wtUpdateViewerCount();
     }
 
     /* ── Toggle buttons UI ── */
@@ -457,9 +575,18 @@ class RoomSocketManager {
         `).join('');
     }
 
-    play()    { this.socket.emit('play'); }
-    pause()   { this.socket.emit('pause'); }
-    seek(t)   { this.socket.emit('seek', { time: t }); }
+    play()    {
+        if (this.wtSessionVideoId) { this.socket.emit('session-video-play'); return; }
+        this.socket.emit('play');
+    }
+    pause()   {
+        if (this.wtSessionVideoId) { this.socket.emit('session-video-pause'); return; }
+        this.socket.emit('pause');
+    }
+    seek(t)   {
+        if (this.wtSessionVideoId) { this.socket.emit('session-video-seek', { time: t }); return; }
+        this.socket.emit('seek', { time: t });
+    }
     nextSong(){ this.socket.emit('next-song'); }
 
     addToQueue(songId) {
@@ -647,6 +774,162 @@ class RoomSocketManager {
                 reject(err);
             }
         }, 1500);
+    }
+
+    /* ── Watch Together ─────────────────────────────────────── */
+
+    toggleWatchTogether() {
+        if (!this.wtZone) return;
+        const open = !this.wtZone.classList.contains('hidden');
+        if (open) {
+            // Close — but only if no active session
+            if (this.wtSessionVideoId) {
+                this.showToast('End the session first before closing', 'info');
+                return;
+            }
+            this.wtZone.classList.add('hidden');
+            this.wtToggleBtn.classList.remove('wt-active');
+        } else {
+            // Also close music upload zone if open
+            if (this.roomUploadZone && !this.roomUploadZone.classList.contains('hidden')) {
+                this.roomUploadZone.classList.add('hidden');
+                if (this.roomUploadBtn) this.roomUploadBtn.textContent = '⬆ Upload';
+            }
+            this.wtZone.classList.remove('hidden');
+            this.wtToggleBtn.classList.add('wt-active');
+            // Decide which sub-state to show
+            if (this.wtSessionVideoId) {
+                this._wtShowState(this.wtMode === 'host' ? 'loaded' : 'guest');
+            } else {
+                this._wtShowState('idle');
+            }
+        }
+    }
+
+    // Show one of three sub-states: 'idle' | 'loaded' | 'guest'
+    _wtShowState(state) {
+        if (this.wtIdle)         this.wtIdle.classList.toggle('hidden', state !== 'idle');
+        if (this.wtLoaded)       this.wtLoaded.classList.toggle('hidden', state !== 'loaded');
+        if (this.wtGuestWaiting) this.wtGuestWaiting.classList.toggle('hidden', state !== 'guest');
+    }
+
+    _wtStripExtension(filename) {
+        return filename.replace(/\.[^.]+$/, '');
+    }
+
+    _wtFormatDuration(s) {
+        if (!s) return '';
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        const sec = Math.floor(s % 60);
+        if (h > 0) return `${h}h ${m}m`;
+        return `${m}m ${sec}s`;
+    }
+
+    _wtUpdateLoadedPanel(filename, duration) {
+        if (this.wtFilename) this.wtFilename.textContent = filename;
+        if (this.wtMeta) {
+            const sizeMB = ''; // size not sent back, omit
+            const dur = this._wtFormatDuration(duration);
+            this.wtMeta.textContent = dur ? `Duration: ${dur}` : 'Session active';
+        }
+        this._wtUpdateViewerCount();
+        this._wtShowState('loaded');
+    }
+
+    _wtUpdateViewerCount() {
+        if (!this.wtViewerCount || !this.roomData) return;
+        const n = this.roomData.userCount || (this.roomData.users ? this.roomData.users.length : 2);
+        this.wtViewerCount.textContent = `${n} watching`;
+    }
+
+    async uploadSessionVideo(file) {
+        if (!file) return;
+
+        // Warn for MKV
+        const isMkv = /\.mkv$/i.test(file.name);
+        if (this.wtFormatWarn) {
+            this.wtFormatWarn.style.display = isMkv ? 'block' : 'none';
+        }
+
+        // Show progress UI
+        if (this.wtUploadArea) this.wtUploadArea.style.display = 'none';
+        if (this.wtUploadProgress) this.wtUploadProgress.classList.remove('hidden');
+        if (this.wtProgressText) this.wtProgressText.textContent =
+            `Uploading ${file.name}… (0% — 0.0 MB / ${(file.size / 1024 / 1024).toFixed(1)} MB)`;
+
+        const fd = new FormData();
+        fd.append('video', file);
+        fd.append('roomCode', this.roomCode);
+
+        try {
+            const videoId = await new Promise((resolve, reject) => {
+                const xhr = new XMLHttpRequest();
+                xhr.upload.addEventListener('progress', e => {
+                    if (!e.lengthComputable) return;
+                    const pct = (e.loaded / e.total) * 100;
+                    if (this.wtProgressFill) this.wtProgressFill.style.width = `${pct}%`;
+                    const loadedMB = (e.loaded / 1024 / 1024).toFixed(1);
+                    const totalMB  = (e.total  / 1024 / 1024).toFixed(1);
+                    if (this.wtProgressText)
+                        this.wtProgressText.textContent = `Uploading ${file.name}… ${Math.round(pct)}% (${loadedMB} MB / ${totalMB} MB)`;
+                });
+                xhr.addEventListener('load', () => {
+                    let r;
+                    try { r = JSON.parse(xhr.responseText); } catch { return reject(new Error('Bad response')); }
+                    if (xhr.status === 200 && r.success) resolve(r.video.id);
+                    else reject(new Error(r.message || `HTTP ${xhr.status}`));
+                });
+                xhr.addEventListener('error', () => reject(new Error('Network error')));
+                xhr.open('POST', '/api/session-upload');
+                xhr.send(fd);
+            });
+
+            // Upload done — now broadcast to the room
+            this.wtSessionVideoId = videoId;
+            this.wtMode = 'host';
+            this.socket.emit('session-video-load', {
+                videoId,
+                filename: file.name,
+                duration: 0 // server probes it; client gets it back via session-video-loaded
+            });
+
+            // The 'session-video-loaded' event will come back to us too (server broadcasts to ALL)
+            // and _wtUpdateLoadedPanel will be called from there.
+            // Show loaded panel immediately so host doesn't see a blank state
+            this._wtUpdateLoadedPanel(file.name, 0);
+            this.showToast('🎬 Watch Together session started!', 'success');
+
+        } catch (err) {
+            this.showToast(`Upload failed: ${err.message}`, 'error');
+        } finally {
+            // Reset progress UI
+            if (this.wtUploadArea) this.wtUploadArea.style.display = '';
+            if (this.wtUploadProgress) this.wtUploadProgress.classList.add('hidden');
+            if (this.wtProgressFill) this.wtProgressFill.style.width = '0%';
+            if (this.wtFileInput) this.wtFileInput.value = '';
+        }
+    }
+
+    async endWatchSession() {
+        if (!this.wtSessionVideoId) return;
+        const vid = this.wtSessionVideoId;
+        this.wtSessionVideoId = null;
+        this.wtMode = 'none';
+
+        // Tell everyone session is done
+        this.socket.emit('session-video-end');
+
+        // Delete the file from the server
+        await fetch(`/api/session-video/${vid}`, { method: 'DELETE' }).catch(() => {});
+
+        // Reset player
+        this.audioPlayer.reset();
+
+        // Reset WT UI back to idle
+        this._wtShowState('idle');
+        if (this.wtFormatWarn) this.wtFormatWarn.style.display = 'none';
+        this.showToast('Watch Together session ended — file deleted', 'success');
     }
 
     /* ── Share modal ── */
